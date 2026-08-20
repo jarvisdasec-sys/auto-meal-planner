@@ -7,6 +7,7 @@ import EnergyTracker from './EnergyTracker';
 import GroceryEstimator from './GroceryEstimator';
 import PortionGallery from './PortionGallery';
 import HistoryTracker from './HistoryTracker';
+import RecipeBox from './RecipeBox';
 
 const TABS = [
   { id: 'profile', label: 'Profile Setup' },
@@ -15,6 +16,7 @@ const TABS = [
   { id: 'grocery', label: 'Grocery Estimator' },
   { id: 'portion', label: 'Portion' },
   { id: 'history', label: 'History' },
+  { id: 'recipes', label: 'Recipe Box' },
 ] as const;
 
 type TabId = (typeof TABS)[number]['id'];
@@ -56,6 +58,7 @@ export default function Dashboard() {
         {activeTab === 'grocery' && <GroceryEstimator />}
         {activeTab === 'portion' && <PortionGallery />}
         {activeTab === 'history' && <HistoryTracker />}
+        {activeTab === 'recipes' && <RecipeBox />}
       </main>
     </div>
   );

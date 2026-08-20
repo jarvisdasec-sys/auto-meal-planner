@@ -12,6 +12,7 @@ export default function ScanBarcodeButton() {
   const foodCatalog = useMealPlannerStore((s) => s.foodCatalog);
   const logFood = useMealPlannerStore((s) => s.logFood);
   const addCustomFood = useMealPlannerStore((s) => s.addCustomFood);
+  const addSavedRecipe = useMealPlannerStore((s) => s.addSavedRecipe);
 
   const [scannerOpen, setScannerOpen] = useState(false);
   const [customFoodOpen, setCustomFoodOpen] = useState(false);
@@ -84,6 +85,15 @@ export default function ScanBarcodeButton() {
         mealWindows: [input.mealWindow],
       };
       addCustomFood(newFood);
+      addSavedRecipe({
+        id: `recipe-${newFood.id}`,
+        foodId: newFood.id,
+        name: newFood.name,
+        calories: newFood.caloriesRaw,
+        proteinGrams: newFood.proteinGrams,
+        carbGrams: newFood.carbGrams,
+        fatGrams: newFood.fatGrams,
+      });
       logFood(newFood.id, newFood.name, newFood.caloriesRaw, 'raw', 'raw');
     } else {
       logFood(`quick-${crypto.randomUUID()}`, input.name, input.calories, 'raw', 'raw');

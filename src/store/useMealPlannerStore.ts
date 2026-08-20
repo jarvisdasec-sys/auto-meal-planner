@@ -28,6 +28,22 @@ export interface LoggedFoodEntry {
   timestamp: string;
 }
 
+export interface HydrationEntry {
+  id: string;
+  ounces: number;
+  timestamp: string;
+}
+
+export interface SavedRecipe {
+  id: string;
+  foodId?: string;
+  name: string;
+  calories: number;
+  proteinGrams: number;
+  carbGrams: number;
+  fatGrams: number;
+}
+
 const DEFAULT_PROFILE: UserProfile = {
   fullName: 'Alex Johnson',
   heightCm: 175,
@@ -50,6 +66,8 @@ interface MealPlannerState {
   foodCatalog: CatalogFoodItem[];
   exerciseLogs: ExerciseLog[];
   loggedFoods: LoggedFoodEntry[];
+  hydrationLogs: HydrationEntry[];
+  savedRecipes: SavedRecipe[];
 
   updateProfile: (partial: Partial<UserProfile>) => void;
   setGender: (gender: Gender) => void;
@@ -83,6 +101,12 @@ interface MealPlannerState {
 
   addCustomFood: (food: CatalogFoodItem) => void;
 
+  addHydration: (ounces: number) => void;
+  removeHydration: (id: string) => void;
+
+  addSavedRecipe: (recipe: SavedRecipe) => void;
+  removeSavedRecipe: (id: string) => void;
+
   calorieAdjustmentPlan: SmoothAdjustmentPlan | null;
   setCalorieAdjustmentPlan: (plan: SmoothAdjustmentPlan) => void;
   clearCalorieAdjustmentPlan: () => void;
@@ -95,6 +119,8 @@ export const useMealPlannerStore = create<MealPlannerState>((set, get) => ({
   foodCatalog: FOOD_CATALOG,
   exerciseLogs: [],
   loggedFoods: [],
+  hydrationLogs: [],
+  savedRecipes: [],
   calorieAdjustmentPlan: null,
 
   updateProfile: (partial) => set((state) => ({ profile: { ...state.profile, ...partial } })),
@@ -195,6 +221,25 @@ export const useMealPlannerStore = create<MealPlannerState>((set, get) => ({
         ? state.foodCatalog
         : [...state.foodCatalog, food],
     })),
+
+  addHydration: (ounces) =>
+    set((state) => ({
+      hydrationLogs: [
+        ...state.hydrationLogs,
+        { id: crypto.randomUUID(), ounces, timestamp: new Date().toISOString() },
+      ],
+    })),
+  removeHydration: (id) =>
+    set((state) => ({ hydrationLogs: state.hydrationLogs.filter((entry) => entry.id !== id) })),
+
+  addSavedRecipe: (recipe) =>
+    set((state) => ({
+      savedRecipes: state.savedRecipes.some((existing) => existing.id === recipe.id)
+        ? state.savedRecipes
+        : [...state.savedRecipes, recipe],
+    })),
+  removeSavedRecipe: (id) =>
+    set((state) => ({ savedRecipes: state.savedRecipes.filter((recipe) => recipe.id !== id) })),
 
   setCalorieAdjustmentPlan: (calorieAdjustmentPlan) => set({ calorieAdjustmentPlan }),
   clearCalorieAdjustmentPlan: () => set({ calorieAdjustmentPlan: null }),

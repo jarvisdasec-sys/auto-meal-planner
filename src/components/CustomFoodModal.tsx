@@ -133,7 +133,7 @@ export default function CustomFoodModal({ open, barcode, onClose, onSave }: Cust
             checked={saveToCatalog}
             onChange={(e) => setSaveToCatalog(e.target.checked)}
           />
-          Save as reusable recipe/food item
+          Save as Custom Recipe
         </label>
         <div className="flex gap-2 pt-2">
           <button

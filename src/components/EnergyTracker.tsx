@@ -8,6 +8,7 @@ import Card from './ui/Card';
 import ScanBarcodeButton from './ScanBarcodeButton';
 import CookingMethodControls from './CookingMethodControls';
 import EatingOutModal from './EatingOutModal';
+import HydrationTracker from './HydrationTracker';
 
 export default function EnergyTracker() {
   const profile = useMealPlannerStore((s) => s.profile);
@@ -261,6 +262,10 @@ export default function EnergyTracker() {
           )}
         </div>
       </Card>
+
+      <div className="lg:col-span-3">
+        <HydrationTracker />
+      </div>
 
       <EatingOutModal
         open={eatingOutOpen}
