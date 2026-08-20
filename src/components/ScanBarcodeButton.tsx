@@ -3,6 +3,7 @@
 import { useCallback, useState } from 'react';
 import { useMealPlannerStore } from '@/store/useMealPlannerStore';
 import { fetchProductByBarcode } from '@/lib/openFoodFacts';
+import { buildStorePrices } from '@/lib/stores';
 import type { CatalogFoodItem } from '@/lib/foodCatalog';
 import BarcodeScannerModal from './BarcodeScannerModal';
 import CustomFoodModal, { type CustomFoodInput } from './CustomFoodModal';
@@ -24,7 +25,7 @@ export default function ScanBarcodeButton() {
 
       const existing = foodCatalog.find((food) => food.barcode === barcode);
       if (existing) {
-        logFood(existing.id, existing.name, existing.caloriesRaw, 'raw');
+        logFood(existing.id, existing.name, existing.caloriesRaw, 'raw', 'raw');
         setStatus(`Logged ${existing.name} from catalog.`);
         return;
       }
@@ -50,11 +51,13 @@ export default function ScanBarcodeButton() {
         carbGrams: product.carbGrams,
         fatGrams: product.fatGrams,
         snackProfile: [],
-        estimatedPrices: { walmart: 0, foodLion: 0, aldi: 0, kroger: 0 },
+        estimatedPrices: buildStorePrices(0),
+        cookingOptions: [{ method: 'raw', prepTimeMinutes: 0, cookTimeMinutes: 0, macroMultiplier: { calories: 1, protein: 1, carbs: 1, fat: 1 } }],
+        dietaryTags: { allergens: [], isHighFodmap: false, isGerdTrigger: false, containsGluten: false, containsLactose: false, spiceLevel: 'none' },
         mealWindows: ['snacks'],
       };
       addCustomFood(newFood);
-      logFood(newFood.id, newFood.name, newFood.caloriesRaw, 'raw');
+      logFood(newFood.id, newFood.name, newFood.caloriesRaw, 'raw', 'raw');
       setStatus(`Logged ${newFood.name} (${newFood.caloriesRaw} kcal) from Open Food Facts.`);
     },
     [foodCatalog, logFood, addCustomFood],
@@ -75,13 +78,15 @@ export default function ScanBarcodeButton() {
         carbGrams: input.carbGrams,
         fatGrams: input.fatGrams,
         snackProfile: [],
-        estimatedPrices: { walmart: 0, foodLion: 0, aldi: 0, kroger: 0 },
+        estimatedPrices: buildStorePrices(0),
+        cookingOptions: [{ method: 'raw', prepTimeMinutes: 0, cookTimeMinutes: 0, macroMultiplier: { calories: 1, protein: 1, carbs: 1, fat: 1 } }],
+        dietaryTags: { allergens: [], isHighFodmap: false, isGerdTrigger: false, containsGluten: false, containsLactose: false, spiceLevel: 'none' },
         mealWindows: [input.mealWindow],
       };
       addCustomFood(newFood);
-      logFood(newFood.id, newFood.name, newFood.caloriesRaw, 'raw');
+      logFood(newFood.id, newFood.name, newFood.caloriesRaw, 'raw', 'raw');
     } else {
-      logFood(`quick-${crypto.randomUUID()}`, input.name, input.calories, 'raw');
+      logFood(`quick-${crypto.randomUUID()}`, input.name, input.calories, 'raw', 'raw');
     }
     setStatus(`Logged ${input.name} (${input.calories} kcal).`);
     setPendingBarcode(null);

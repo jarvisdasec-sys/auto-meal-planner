@@ -17,11 +17,42 @@ export type Goal = 'fat_loss' | 'maintenance' | 'muscle_gain';
 
 export type SnackCraving = 'salty' | 'sweet' | 'crunchy' | 'savory' | 'high_protein';
 
-export type StoreName = 'walmart' | 'foodLion' | 'aldi' | 'kroger';
+export type StoreName =
+  | 'walmart'
+  | 'kroger'
+  | 'albertsons'
+  | 'aldi'
+  | 'costco'
+  | 'wholeFoods'
+  | 'traderJoes'
+  | 'target'
+  | 'samsClub'
+  | 'publix';
 
 export type MealWindow = 'breakfast' | 'lunch' | 'dinner' | 'snacks';
 
+export type Allergen =
+  | 'peanuts'
+  | 'tree_nuts'
+  | 'milk'
+  | 'eggs'
+  | 'fish'
+  | 'shellfish'
+  | 'soy'
+  | 'wheat'
+  | 'sesame';
+
+export type GICondition =
+  | 'low_fodmap_ibs'
+  | 'acid_reflux_gerd'
+  | 'lactose_intolerance'
+  | 'gluten_sensitivity'
+  | 'sensitive_stomach';
+
+export type SpiceLevel = 'none' | 'mild' | 'medium' | 'spicy';
+
 export interface UserProfile {
+  fullName: string;
   heightCm: number;
   currentWeightKg: number;
   age: number;
@@ -32,13 +63,37 @@ export interface UserProfile {
   snackCravings: SnackCraving[];
   dietaryRestrictions: string[];
   preferredStore: StoreName;
+  majorAllergens: Allergen[];
+  giConditions: GICondition[];
+  spiceLevel: SpiceLevel;
+  customExclusions: string[];
 }
 
-export interface EstimatedPrices {
-  walmart: number;
-  foodLion: number;
-  aldi: number;
-  kroger: number;
+export type EstimatedPrices = Record<StoreName, number>;
+
+export type CookingMethod =
+  | 'raw'
+  | 'steamed'
+  | 'boiled'
+  | 'baked'
+  | 'air_fried'
+  | 'pan_fried'
+  | 'deep_fried'
+  | 'grilled';
+
+export interface CookingOption {
+  method: CookingMethod;
+  prepTimeMinutes: number;
+  cookTimeMinutes: number;
+  recommendedTempF?: number;
+  macroMultiplier: {
+    calories: number; // e.g., 1.0 for steaming, slightly lower for boiling fat off, etc.
+    protein: number;
+    carbs: number;
+    fat: number;
+  };
+  addedFatGrams?: number; // Added oil/butter for pan frying
+  cookingTip?: string;
 }
 
 export interface FoodItem {
@@ -58,6 +113,114 @@ export interface FoodItem {
   snackProfile: SnackCraving[];
   /** Estimated price (per portion/unit) at each supported store */
   estimatedPrices: EstimatedPrices;
+  /** High-quality food photo; UI falls back to a default category image when absent */
+  imageUrl?: string;
+  /** Available cooking methods with their macro/time impact */
+  cookingOptions: CookingOption[];
+  /** Allergen, FODMAP, GERD-trigger, and spice metadata used by the dietary safeguards engine */
+  dietaryTags: DietaryTags;
+}
+
+export interface DietaryTags {
+  allergens: Allergen[];
+  isHighFodmap: boolean;
+  isGerdTrigger: boolean;
+  containsGluten: boolean;
+  containsLactose: boolean;
+  spiceLevel: SpiceLevel;
+}
+
+// ============================================================
+// COOKING METHOD & PREP ENGINE (oil/butter additions, macro adjustments)
+// ============================================================
+
+export type OilType = 'olive_oil' | 'butter' | 'coconut_oil' | 'avocado_oil';
+
+export interface OilAddition {
+  oilType: OilType;
+  amount: number;
+  unit: 'tbsp' | 'tsp';
+  addedCalories: number;
+  addedFatGrams: number;
+}
+
+// Calories/fat contributed per tablespoon of each added cooking fat
+export const OIL_NUTRITION_PER_TBSP: Record<OilType, { calories: number; fatGrams: number }> = {
+  olive_oil: { calories: 124, fatGrams: 14 },
+  butter: { calories: 102, fatGrams: 11.5 },
+  coconut_oil: { calories: 117, fatGrams: 13.6 },
+  avocado_oil: { calories: 124, fatGrams: 14 },
+};
+
+const TSP_PER_TBSP = 3;
+
+/** True when the cooking method typically requires an added-oil/butter input. */
+export function requiresOilInput(method: CookingMethod): boolean {
+  return method === 'pan_fried' || method === 'deep_fried';
+}
+
+/** Calculate the calories and fat added by a given amount of cooking oil or butter. */
+export function calculateAddedOilCalories(
+  oilType: OilType,
+  amount: number,
+  unit: 'tbsp' | 'tsp',
+): { addedCalories: number; addedFatGrams: number } {
+  const tablespoons = unit === 'tsp' ? amount / TSP_PER_TBSP : amount;
+  const perTbsp = OIL_NUTRITION_PER_TBSP[oilType];
+  return {
+    addedCalories: Math.round(perTbsp.calories * tablespoons),
+    addedFatGrams: Math.round(perTbsp.fatGrams * tablespoons * 10) / 10,
+  };
+}
+
+export interface AdjustedMacros {
+  calories: number;
+  proteinGrams: number;
+  carbGrams: number;
+  fatGrams: number;
+}
+
+/** Apply a cooking option's macro multiplier (and any inherent added fat) to a food's base macros. */
+export function applyCookingOption(
+  base: { calories: number; proteinGrams: number; carbGrams: number; fatGrams: number },
+  option: CookingOption,
+): AdjustedMacros {
+  return {
+    calories: Math.round(base.calories * option.macroMultiplier.calories),
+    proteinGrams: Math.round(base.proteinGrams * option.macroMultiplier.protein * 10) / 10,
+    carbGrams: Math.round(base.carbGrams * option.macroMultiplier.carbs * 10) / 10,
+    fatGrams: Math.round((base.fatGrams * option.macroMultiplier.fat + (option.addedFatGrams ?? 0)) * 10) / 10,
+  };
+}
+
+// ============================================================
+// UNIT CONVERSION HELPERS (imperial input <-> metric engine math)
+// ============================================================
+
+const CM_PER_INCH = 2.54;
+const KG_PER_LB = 0.45359237;
+
+/** Convert feet + inches to total centimeters for use in BMR/TDEE math. */
+export function feetInchesToCm(feet: number, inches: number): number {
+  return (feet * 12 + inches) * CM_PER_INCH;
+}
+
+/** Convert total centimeters back to whole feet + inches for display. */
+export function cmToFeetInches(cm: number): { feet: number; inches: number } {
+  const totalInches = cm / CM_PER_INCH;
+  const feet = Math.floor(totalInches / 12);
+  const inches = Math.round(totalInches - feet * 12);
+  return inches === 12 ? { feet: feet + 1, inches: 0 } : { feet, inches };
+}
+
+/** Convert pounds to kilograms for use in BMR/TDEE math. */
+export function lbsToKg(lbs: number): number {
+  return lbs * KG_PER_LB;
+}
+
+/** Convert kilograms back to pounds for display. */
+export function kgToLbs(kg: number): number {
+  return kg / KG_PER_LB;
 }
 
 export interface ExerciseLog {
@@ -286,9 +449,121 @@ export function estimateGroceryCost(foods: FoodItem[], preferredStore: StoreName
  * Calculate estimated grocery cost at every supported store, for easy price comparison.
  */
 export function estimateGroceryCostByAllStores(foods: FoodItem[]): Record<StoreName, GroceryCostEstimate> {
-  const stores: StoreName[] = ['walmart', 'foodLion', 'aldi', 'kroger'];
+  const stores: StoreName[] = [
+    'walmart',
+    'kroger',
+    'albertsons',
+    'aldi',
+    'costco',
+    'wholeFoods',
+    'traderJoes',
+    'target',
+    'samsClub',
+    'publix',
+  ];
   return stores.reduce((acc, store) => {
     acc[store] = estimateGroceryCost(foods, store);
     return acc;
   }, {} as Record<StoreName, GroceryCostEstimate>);
+}
+
+// ============================================================
+// 6. DIETARY SAFEGUARDS, ALLERGY & GI ENGINE
+// ============================================================
+
+type DietaryProfile = Pick<UserProfile, 'majorAllergens' | 'giConditions' | 'spiceLevel' | 'customExclusions'>;
+
+const SPICE_LEVEL_RANK: Record<SpiceLevel, number> = { none: 0, mild: 1, medium: 2, spicy: 3 };
+
+/**
+ * True when a food must be hard-blocked from recommendations: it contains a major allergen
+ * or matches one of the user's custom blacklisted ingredients.
+ */
+export function isFoodBlockedForProfile(food: FoodItem, profile: DietaryProfile): boolean {
+  if (profile.majorAllergens.some((allergen) => food.dietaryTags.allergens.includes(allergen))) return true;
+  const lowerName = food.name.toLowerCase();
+  if (profile.customExclusions.some((term) => term.trim() && lowerName.includes(term.trim().toLowerCase()))) {
+    return true;
+  }
+  return false;
+}
+
+/** Filter blacklisted foods (allergens + custom exclusions) out of a list of recommendations. */
+export function filterFoodsForProfile<T extends FoodItem>(foods: T[], profile: DietaryProfile): T[] {
+  return foods.filter((food) => !isFoodBlockedForProfile(food, profile));
+}
+
+export interface DietaryWarning {
+  label: string;
+  severity: 'amber' | 'red';
+}
+
+/**
+ * Build the set of warning badges to display for a food, based on the user's allergens,
+ * GI conditions, spice tolerance, and custom exclusions. Includes allergen/exclusion matches
+ * so already-logged or scanned items still surface a warning even if not pre-filtered.
+ */
+export function getDietaryWarnings(food: FoodItem, profile: DietaryProfile): DietaryWarning[] {
+  const warnings: DietaryWarning[] = [];
+  const tags = food.dietaryTags;
+
+  const matchedAllergens = profile.majorAllergens.filter((allergen) => tags.allergens.includes(allergen));
+  if (matchedAllergens.length > 0) {
+    warnings.push({
+      label: `⚠️ Contains ${matchedAllergens.join(', ')} - Allergen`,
+      severity: 'red',
+    });
+  }
+
+  const lowerName = food.name.toLowerCase();
+  const matchedExclusion = profile.customExclusions.find(
+    (term) => term.trim() && lowerName.includes(term.trim().toLowerCase()),
+  );
+  if (matchedExclusion) {
+    warnings.push({ label: `⚠️ Contains excluded ingredient: ${matchedExclusion}`, severity: 'red' });
+  }
+
+  if (profile.giConditions.includes('lactose_intolerance') && tags.containsLactose) {
+    warnings.push({ label: '⚠️ Contains Dairy - Lactose Trigger', severity: 'amber' });
+  }
+  if (profile.giConditions.includes('gluten_sensitivity') && tags.containsGluten) {
+    warnings.push({ label: '⚠️ Contains Gluten - Sensitivity Trigger', severity: 'amber' });
+  }
+  if (profile.giConditions.includes('low_fodmap_ibs') && tags.isHighFodmap) {
+    warnings.push({ label: '⚠️ High FODMAP - IBS Trigger', severity: 'amber' });
+  }
+  if ((profile.giConditions.includes('acid_reflux_gerd') || profile.giConditions.includes('sensitive_stomach')) && tags.isGerdTrigger) {
+    warnings.push({ label: '🌶️ GERD/Sensitive Stomach Trigger', severity: 'amber' });
+  }
+  if (SPICE_LEVEL_RANK[tags.spiceLevel] > SPICE_LEVEL_RANK[profile.spiceLevel]) {
+    warnings.push({ label: `🌶️ High Spice (${tags.spiceLevel}) - Exceeds Your Preference`, severity: 'amber' });
+  }
+
+  return warnings;
+}
+
+// ============================================================
+// 7. EATING-OUT & FLEXIBLE MACRO ADJUSTMENT ENGINE
+// ============================================================
+
+export interface SmoothAdjustmentPlan {
+  /** Total calories consumed beyond the daily target for the triggering meal */
+  excessCalories: number;
+  /** Number of upcoming days the overage is spread across */
+  daysToSpread: number;
+  /** Calories to trim from the daily target on each of those days */
+  dailyOffset: number;
+}
+
+/**
+ * Instead of slashing tomorrow's calories by the full overage, spread an eating-out
+ * overshoot evenly across the next few days for a gentler adjustment.
+ */
+export function calculateSmoothAdjustment(excessCalories: number, daysToSpread = 3): SmoothAdjustmentPlan {
+  const clampedDays = Math.max(1, Math.round(daysToSpread));
+  return {
+    excessCalories: Math.round(excessCalories),
+    daysToSpread: clampedDays,
+    dailyOffset: Math.round(excessCalories / clampedDays),
+  };
 }

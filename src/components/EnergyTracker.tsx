@@ -2,34 +2,45 @@
 
 import { useMemo, useState } from 'react';
 import { useMealPlannerStore } from '@/store/useMealPlannerStore';
-import { calculateMetabolicSummary, getEnergyBalanceSnapshot } from '@/lib/fitnessMealPlanner';
+import { calculateMetabolicSummary, getDietaryWarnings, getEnergyBalanceSnapshot } from '@/lib/fitnessMealPlanner';
+import { formatLabel } from '@/lib/format';
 import Card from './ui/Card';
 import ScanBarcodeButton from './ScanBarcodeButton';
+import CookingMethodControls from './CookingMethodControls';
+import EatingOutModal from './EatingOutModal';
 
 export default function EnergyTracker() {
   const profile = useMealPlannerStore((s) => s.profile);
+  const foodCatalog = useMealPlannerStore((s) => s.foodCatalog);
   const exerciseLogs = useMealPlannerStore((s) => s.exerciseLogs);
   const loggedFoods = useMealPlannerStore((s) => s.loggedFoods);
   const addExerciseLog = useMealPlannerStore((s) => s.addExerciseLog);
   const removeExerciseLog = useMealPlannerStore((s) => s.removeExerciseLog);
   const removeLoggedFood = useMealPlannerStore((s) => s.removeLoggedFood);
+  const updateLoggedFoodCooking = useMealPlannerStore((s) => s.updateLoggedFoodCooking);
+  const logFood = useMealPlannerStore((s) => s.logFood);
+  const calorieAdjustmentPlan = useMealPlannerStore((s) => s.calorieAdjustmentPlan);
+  const setCalorieAdjustmentPlan = useMealPlannerStore((s) => s.setCalorieAdjustmentPlan);
+  const clearCalorieAdjustmentPlan = useMealPlannerStore((s) => s.clearCalorieAdjustmentPlan);
   const totalConsumedCalories = useMealPlannerStore((s) => s.totalConsumedCalories());
 
   const [activityName, setActivityName] = useState('');
   const [durationMinutes, setDurationMinutes] = useState('');
   const [caloriesBurned, setCaloriesBurned] = useState('');
+  const [eatingOutOpen, setEatingOutOpen] = useState(false);
 
   const summary = useMemo(() => calculateMetabolicSummary(profile), [profile]);
+  const adjustedTargetCalories = summary.targetCalories - (calorieAdjustmentPlan?.dailyOffset ?? 0);
 
   const snapshot = useMemo(
     () =>
       getEnergyBalanceSnapshot({
         date: new Date().toISOString().slice(0, 10),
-        targetCalorieGoal: summary.targetCalories,
+        targetCalorieGoal: adjustedTargetCalories,
         totalConsumedCalories,
         exerciseLogs,
       }),
-    [summary.targetCalories, totalConsumedCalories, exerciseLogs],
+    [adjustedTargetCalories, totalConsumedCalories, exerciseLogs],
   );
 
   const handleAddExercise = (e: React.FormEvent) => {
@@ -50,7 +61,28 @@ export default function EnergyTracker() {
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
       <Card title="Energy Balance" className="lg:col-span-2">
-        <ScanBarcodeButton />
+        <div className="flex flex-wrap gap-2">
+          <ScanBarcodeButton />
+          <button
+            onClick={() => setEatingOutOpen(true)}
+            className="rounded-lg bg-white/5 px-4 py-2 text-sm font-semibold text-slate-200 transition-colors hover:bg-white/10"
+          >
+            Eating Out
+          </button>
+        </div>
+
+        {calorieAdjustmentPlan && (
+          <div className="mt-4 flex items-center justify-between rounded-xl bg-accent-amber/10 px-3 py-2 text-xs text-accent-amber">
+            <span>
+              Smooth Adjustment active: -{calorieAdjustmentPlan.dailyOffset} kcal/day for {calorieAdjustmentPlan.daysToSpread}{' '}
+              days (from a {calorieAdjustmentPlan.excessCalories} kcal restaurant overage).
+            </span>
+            <button onClick={clearCalorieAdjustmentPlan} className="ml-3 shrink-0 font-semibold hover:text-accent-red">
+              Clear
+            </button>
+          </div>
+        )}
+
         <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
           <StatBox label="Target Goal" value={`${Math.round(snapshot.targetCalorieGoal)}`} />
           <StatBox label="Consumed" value={`${Math.round(snapshot.totalConsumedCalories)}`} />
@@ -68,25 +100,94 @@ export default function EnergyTracker() {
             <p className="text-sm text-slate-500">No foods logged yet — log food from the Meal Plan tab.</p>
           ) : (
             <ul className="space-y-2">
-              {loggedFoods.map((entry) => (
-                <li
-                  key={entry.id}
-                  className="flex items-center justify-between rounded-lg bg-white/5 px-3 py-2 text-sm"
-                >
-                  <span className="text-slate-200">
-                    {entry.name} <span className="text-slate-500">({entry.portionMode})</span>
-                  </span>
-                  <div className="flex items-center gap-3">
-                    <span className="font-semibold text-accent-green">{entry.calories} kcal</span>
-                    <button
-                      onClick={() => removeLoggedFood(entry.id)}
-                      className="text-xs text-slate-500 hover:text-accent-red"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                </li>
-              ))}
+              {loggedFoods.map((entry) => {
+                const food = foodCatalog.find((f) => f.id === entry.foodId);
+                const warnings = food ? getDietaryWarnings(food, profile) : [];
+                return (
+                  <li key={entry.id} className="rounded-lg bg-white/5 px-3 py-2 text-sm">
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-200">
+                        {entry.name} <span className="text-slate-500">({entry.portionMode})</span>
+                      </span>
+                      <div className="flex items-center gap-3">
+                        <span className="font-semibold text-accent-green">{entry.calories} kcal</span>
+                        <button
+                          onClick={() => removeLoggedFood(entry.id)}
+                          className="text-xs text-slate-500 hover:text-accent-red"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                    {warnings.length > 0 && (
+                      <div className="mt-1.5 space-y-1">
+                        {warnings.map((warning) => (
+                          <p
+                            key={warning.label}
+                            className={`rounded-md px-2 py-1 text-[11px] font-medium ${
+                              warning.severity === 'red'
+                                ? 'bg-accent-red/15 text-accent-red'
+                                : 'bg-accent-amber/15 text-accent-amber'
+                            }`}
+                          >
+                            {warning.label}
+                          </p>
+                        ))}
+                      </div>
+                    )}
+                    {food ? (
+                      <div className="mt-2">
+                        <CookingMethodControls
+                          cookingOptions={food.cookingOptions}
+                          method={entry.cookingMethod}
+                          onMethodChange={(method) =>
+                            updateLoggedFoodCooking(
+                              entry.id,
+                              method,
+                              entry.oilAddition?.oilType ?? 'olive_oil',
+                              entry.oilAddition?.amount ?? 1,
+                              entry.oilAddition?.unit ?? 'tbsp',
+                            )
+                          }
+                          oilType={entry.oilAddition?.oilType ?? 'olive_oil'}
+                          onOilTypeChange={(oilType) =>
+                            updateLoggedFoodCooking(
+                              entry.id,
+                              entry.cookingMethod,
+                              oilType,
+                              entry.oilAddition?.amount ?? 1,
+                              entry.oilAddition?.unit ?? 'tbsp',
+                            )
+                          }
+                          oilAmount={entry.oilAddition?.amount ?? 1}
+                          onOilAmountChange={(amount) =>
+                            updateLoggedFoodCooking(
+                              entry.id,
+                              entry.cookingMethod,
+                              entry.oilAddition?.oilType ?? 'olive_oil',
+                              amount,
+                              entry.oilAddition?.unit ?? 'tbsp',
+                            )
+                          }
+                          oilUnit={entry.oilAddition?.unit ?? 'tbsp'}
+                          onOilUnitChange={(unit) =>
+                            updateLoggedFoodCooking(
+                              entry.id,
+                              entry.cookingMethod,
+                              entry.oilAddition?.oilType ?? 'olive_oil',
+                              entry.oilAddition?.amount ?? 1,
+                              unit,
+                            )
+                          }
+                          compact
+                        />
+                      </div>
+                    ) : (
+                      <p className="mt-1 text-xs text-slate-500">Cooking method: {formatLabel(entry.cookingMethod)}</p>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           )}
         </div>
@@ -160,6 +261,17 @@ export default function EnergyTracker() {
           )}
         </div>
       </Card>
+
+      <EatingOutModal
+        open={eatingOutOpen}
+        onClose={() => setEatingOutOpen(false)}
+        remainingCalories={snapshot.netCaloriesRemaining}
+        onLogMeal={(item, adjustmentPlan) => {
+          logFood(`restaurant-${item.id}-${crypto.randomUUID()}`, item.name, item.calories, 'raw', 'raw');
+          if (adjustmentPlan) setCalorieAdjustmentPlan(adjustmentPlan);
+          setEatingOutOpen(false);
+        }}
+      />
     </div>
   );
 }

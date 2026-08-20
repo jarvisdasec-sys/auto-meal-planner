@@ -1,9 +1,17 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useMealPlannerStore } from '@/store/useMealPlannerStore';
-import { calculateMetabolicSummary } from '@/lib/fitnessMealPlanner';
-import type { Goal, SnackCraving, StoreName } from '@/lib/fitnessMealPlanner';
+import {
+  calculateMetabolicSummary,
+  cmToFeetInches,
+  feetInchesToCm,
+  kgToLbs,
+  lbsToKg,
+} from '@/lib/fitnessMealPlanner';
+import type { Goal, SnackCraving, Allergen, GICondition, SpiceLevel } from '@/lib/fitnessMealPlanner';
+import { STORE_LABELS, STORE_NAMES } from '@/lib/stores';
+import { formatLabel } from '@/lib/format';
 import Card from './ui/Card';
 
 const ACTIVITY_LEVELS: { value: number; label: string }[] = [
@@ -20,14 +28,29 @@ const GOALS: { value: Goal; label: string }[] = [
   { value: 'muscle_gain', label: 'Muscle Gain' },
 ];
 
-const STORES: { value: StoreName; label: string }[] = [
-  { value: 'walmart', label: 'Walmart' },
-  { value: 'foodLion', label: 'Food Lion' },
-  { value: 'aldi', label: 'Aldi' },
-  { value: 'kroger', label: 'Kroger' },
+const SNACK_CRAVINGS: SnackCraving[] = ['salty', 'sweet', 'crunchy', 'savory', 'high_protein'];
+
+const MAJOR_ALLERGENS: Allergen[] = [
+  'peanuts',
+  'tree_nuts',
+  'milk',
+  'eggs',
+  'fish',
+  'shellfish',
+  'soy',
+  'wheat',
+  'sesame',
 ];
 
-const SNACK_CRAVINGS: SnackCraving[] = ['salty', 'sweet', 'crunchy', 'savory', 'high_protein'];
+const GI_CONDITIONS: GICondition[] = [
+  'low_fodmap_ibs',
+  'acid_reflux_gerd',
+  'lactose_intolerance',
+  'gluten_sensitivity',
+  'sensitive_stomach',
+];
+
+const SPICE_LEVELS: SpiceLevel[] = ['none', 'mild', 'medium', 'spicy'];
 
 export default function ProfileSetupForm() {
   const profile = useMealPlannerStore((s) => s.profile);
@@ -35,26 +58,77 @@ export default function ProfileSetupForm() {
   const setGoal = useMealPlannerStore((s) => s.setGoal);
   const setPreferredStore = useMealPlannerStore((s) => s.setPreferredStore);
   const toggleSnackCraving = useMealPlannerStore((s) => s.toggleSnackCraving);
+  const toggleAllergen = useMealPlannerStore((s) => s.toggleAllergen);
+  const toggleGICondition = useMealPlannerStore((s) => s.toggleGICondition);
+  const setSpiceLevel = useMealPlannerStore((s) => s.setSpiceLevel);
+  const setCustomExclusions = useMealPlannerStore((s) => s.setCustomExclusions);
+
+  const [exclusionInput, setExclusionInput] = useState('');
+
+  const [heightFeet, setHeightFeet] = useState(() => cmToFeetInches(profile.heightCm).feet);
+  const [heightInches, setHeightInches] = useState(() => cmToFeetInches(profile.heightCm).inches);
+  const [weightLbs, setWeightLbs] = useState(() => Math.round(kgToLbs(profile.currentWeightKg)));
 
   const summary = useMemo(() => calculateMetabolicSummary(profile), [profile]);
+
+  const handleHeightChange = (feet: number, inches: number) => {
+    setHeightFeet(feet);
+    setHeightInches(inches);
+    updateProfile({ heightCm: feetInchesToCm(feet, inches) });
+  };
+
+  const handleWeightChange = (lbs: number) => {
+    setWeightLbs(lbs);
+    updateProfile({ currentWeightKg: lbsToKg(lbs) });
+  };
+
+  const addExclusion = () => {
+    const value = exclusionInput.trim();
+    if (!value || profile.customExclusions.includes(value)) return;
+    setCustomExclusions([...profile.customExclusions, value]);
+    setExclusionInput('');
+  };
+
+  const removeExclusion = (value: string) => {
+    setCustomExclusions(profile.customExclusions.filter((item) => item !== value));
+  };
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
       <Card title="Your Profile" subtitle="Update your stats to recalculate targets live" className="lg:col-span-3">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Field label="Height (cm)">
+          <Field label="Full Name" full>
             <input
-              type="number"
-              value={profile.heightCm}
-              onChange={(e) => updateProfile({ heightCm: Number(e.target.value) })}
+              type="text"
+              value={profile.fullName}
+              onChange={(e) => updateProfile({ fullName: e.target.value })}
+              placeholder="e.g. Jordan Smith"
               className="input"
             />
           </Field>
-          <Field label="Weight (kg)">
+          <Field label="Height (ft / in)">
+            <div className="flex gap-2">
+              <input
+                type="number"
+                value={heightFeet}
+                onChange={(e) => handleHeightChange(Number(e.target.value), heightInches)}
+                className="input"
+                placeholder="ft"
+              />
+              <input
+                type="number"
+                value={heightInches}
+                onChange={(e) => handleHeightChange(heightFeet, Number(e.target.value))}
+                className="input"
+                placeholder="in"
+              />
+            </div>
+          </Field>
+          <Field label="Weight (lbs)">
             <input
               type="number"
-              value={profile.currentWeightKg}
-              onChange={(e) => updateProfile({ currentWeightKg: Number(e.target.value) })}
+              value={weightLbs}
+              onChange={(e) => handleWeightChange(Number(e.target.value))}
               className="input"
             />
           </Field>
@@ -109,18 +183,18 @@ export default function ProfileSetupForm() {
           </Field>
           <Field label="Preferred Store" full>
             <div className="flex flex-wrap gap-2">
-              {STORES.map((store) => (
+              {STORE_NAMES.map((store) => (
                 <button
-                  key={store.value}
+                  key={store}
                   type="button"
-                  onClick={() => setPreferredStore(store.value)}
+                  onClick={() => setPreferredStore(store)}
                   className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                    profile.preferredStore === store.value
+                    profile.preferredStore === store
                       ? 'bg-accent text-white'
                       : 'bg-white/5 text-slate-300 hover:bg-white/10'
                   }`}
                 >
-                  {store.label}
+                  {STORE_LABELS[store]}
                 </button>
               ))}
             </div>
@@ -153,16 +227,154 @@ export default function ProfileSetupForm() {
         </div>
       </Card>
 
-      <Card title="Live Metabolic Summary" subtitle="Updates automatically as you edit your profile" className="lg:col-span-2">
-        <div className="space-y-3">
-          <Stat label="BMR" value={`${Math.round(summary.bmr)} kcal`} />
-          <Stat label="TDEE" value={`${Math.round(summary.tdee)} kcal`} />
-          <Stat label="Target Calories" value={`${Math.round(summary.targetCalories)} kcal`} highlight />
-          <div className="mt-2 grid grid-cols-3 gap-2">
-            <MacroStat label="Protein" value={summary.macroTargets.proteinGrams} color="text-accent-green" />
-            <MacroStat label="Carbs" value={summary.macroTargets.carbGrams} color="text-accent-amber" />
-            <MacroStat label="Fats" value={summary.macroTargets.fatGrams} color="text-accent-red" />
+      <div className="space-y-6 lg:col-span-2">
+        <Card title="Live Metabolic Summary" subtitle="Updates automatically as you edit your profile">
+          <div className="space-y-3">
+            <Stat label="BMR" value={`${Math.round(summary.bmr)} kcal`} />
+            <Stat label="TDEE" value={`${Math.round(summary.tdee)} kcal`} />
+            <Stat label="Target Calories" value={`${Math.round(summary.targetCalories)} kcal`} highlight />
+            <div className="mt-2 grid grid-cols-3 gap-2">
+              <MacroStat label="Protein" value={summary.macroTargets.proteinGrams} color="text-accent-green" />
+              <MacroStat label="Carbs" value={summary.macroTargets.carbGrams} color="text-accent-amber" />
+              <MacroStat label="Fats" value={summary.macroTargets.fatGrams} color="text-accent-red" />
+            </div>
           </div>
+        </Card>
+
+        <Card title="Understanding Your Numbers" subtitle="What BMR and TDEE actually mean">
+          <div className="space-y-3 text-sm text-slate-300">
+            <p>
+              <span className="font-semibold text-accent-green">BMR (Basal Metabolic Rate):</span> the baseline
+              calories your body burns at rest just to stay alive — breathing, circulating blood, and cell repair.
+            </p>
+            <p>
+              <span className="font-semibold text-accent">TDEE (Total Daily Energy Expenditure):</span> your
+              actual daily calorie burn, combining your BMR with daily movement, working out, and digestion.
+            </p>
+          </div>
+        </Card>
+      </div>
+
+      <Card
+        title="Allergies & Digestive Health"
+        subtitle="Flagged foods are excluded from recommendations or shown with a warning badge"
+        className="lg:col-span-5"
+      >
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Field label="Major Allergens" full>
+            <div className="flex flex-wrap gap-2">
+              {MAJOR_ALLERGENS.map((allergen) => {
+                const active = profile.majorAllergens.includes(allergen);
+                return (
+                  <label
+                    key={allergen}
+                    className={`cursor-pointer select-none rounded-lg border px-3 py-2 text-sm font-medium capitalize transition-colors ${
+                      active
+                        ? 'border-accent-red bg-accent-red/10 text-accent-red'
+                        : 'border-surface-border bg-white/5 text-slate-300 hover:bg-white/10'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      className="mr-2 accent-accent-red"
+                      checked={active}
+                      onChange={() => toggleAllergen(allergen)}
+                    />
+                    {formatLabel(allergen)}
+                  </label>
+                );
+              })}
+            </div>
+          </Field>
+
+          <Field label="GI Conditions" full>
+            <div className="flex flex-wrap gap-2">
+              {GI_CONDITIONS.map((condition) => {
+                const active = profile.giConditions.includes(condition);
+                return (
+                  <label
+                    key={condition}
+                    className={`cursor-pointer select-none rounded-lg border px-3 py-2 text-sm font-medium capitalize transition-colors ${
+                      active
+                        ? 'border-accent-amber bg-accent-amber/10 text-accent-amber'
+                        : 'border-surface-border bg-white/5 text-slate-300 hover:bg-white/10'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      className="mr-2 accent-accent-amber"
+                      checked={active}
+                      onChange={() => toggleGICondition(condition)}
+                    />
+                    {formatLabel(condition)}
+                  </label>
+                );
+              })}
+            </div>
+          </Field>
+
+          <Field label="Spice Tolerance">
+            <div className="flex flex-wrap gap-2">
+              {SPICE_LEVELS.map((level) => (
+                <button
+                  key={level}
+                  type="button"
+                  onClick={() => setSpiceLevel(level)}
+                  className={`rounded-lg px-3 py-2 text-sm font-medium capitalize transition-colors ${
+                    profile.spiceLevel === level
+                      ? 'bg-accent text-white'
+                      : 'bg-white/5 text-slate-300 hover:bg-white/10'
+                  }`}
+                >
+                  {formatLabel(level)}
+                </button>
+              ))}
+            </div>
+          </Field>
+
+          <Field label="Custom Exclusions (typed ingredients)">
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={exclusionInput}
+                onChange={(e) => setExclusionInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    addExclusion();
+                  }
+                }}
+                placeholder="e.g. cilantro"
+                className="input"
+              />
+              <button
+                type="button"
+                onClick={addExclusion}
+                className="rounded-lg bg-accent/90 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-accent"
+              >
+                Add
+              </button>
+            </div>
+            {profile.customExclusions.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-2">
+                {profile.customExclusions.map((item) => (
+                  <span
+                    key={item}
+                    className="flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs text-slate-200"
+                  >
+                    {item}
+                    <button
+                      type="button"
+                      onClick={() => removeExclusion(item)}
+                      className="text-slate-400 hover:text-accent-red"
+                    >
+                      ✕
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+          </Field>
         </div>
       </Card>
     </div>

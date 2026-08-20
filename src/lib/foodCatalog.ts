@@ -1,4 +1,5 @@
-import type { FoodItem, MealWindow } from './fitnessMealPlanner';
+import type { CookingOption, DietaryTags, FoodItem, MealWindow } from './fitnessMealPlanner';
+import { buildStorePrices } from './stores';
 
 export type FoodCategory = 'protein' | 'carb' | 'fat' | 'vegetable' | 'snack';
 
@@ -7,6 +8,96 @@ export interface CatalogFoodItem extends FoodItem {
   mealWindows: MealWindow[];
 }
 
+// Emoji fallback shown when an image (custom or category default) fails to load
+export const CATEGORY_FALLBACK_ICON: Record<FoodCategory, string> = {
+  protein: '🍗',
+  carb: '🍞',
+  fat: '🥑',
+  vegetable: '🥦',
+  snack: '🍿',
+};
+
+// High-quality Unsplash photo used when a food item has no more specific imageUrl
+export const CATEGORY_FALLBACK_IMAGE: Record<FoodCategory, string> = {
+  protein: 'https://images.unsplash.com/photo-1432139555190-58524dae6a55?w=800&q=80&auto=format&fit=crop',
+  carb: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&q=80&auto=format&fit=crop',
+  fat: 'https://images.unsplash.com/photo-1523049673857-eb18f1d7b578?w=800&q=80&auto=format&fit=crop',
+  vegetable: 'https://images.unsplash.com/photo-1466637574441-749b8f19452f?w=800&q=80&auto=format&fit=crop',
+  snack: 'https://images.unsplash.com/photo-1599490659213-e2b9527bd087?w=800&q=80&auto=format&fit=crop',
+};
+
+// Reusable cooking-option presets, tweakable per item via the optional overrides
+const cookRaw = (): CookingOption => ({
+  method: 'raw',
+  prepTimeMinutes: 0,
+  cookTimeMinutes: 0,
+  macroMultiplier: { calories: 1, protein: 1, carbs: 1, fat: 1 },
+});
+
+const cookSteamed = (prepTimeMinutes = 5, cookTimeMinutes = 10): CookingOption => ({
+  method: 'steamed',
+  prepTimeMinutes,
+  cookTimeMinutes,
+  macroMultiplier: { calories: 0.95, protein: 1, carbs: 1, fat: 0.95 },
+  cookingTip: 'Steaming preserves most nutrients with minimal calorie change.',
+});
+
+const cookBoiled = (prepTimeMinutes = 5, cookTimeMinutes = 12): CookingOption => ({
+  method: 'boiled',
+  prepTimeMinutes,
+  cookTimeMinutes,
+  macroMultiplier: { calories: 0.9, protein: 0.97, carbs: 1, fat: 0.85 },
+  cookingTip: 'Some water-soluble nutrients and fat can leach into the cooking water.',
+});
+
+const cookBaked = (prepTimeMinutes = 5, cookTimeMinutes = 25, recommendedTempF = 400): CookingOption => ({
+  method: 'baked',
+  prepTimeMinutes,
+  cookTimeMinutes,
+  recommendedTempF,
+  macroMultiplier: { calories: 1, protein: 1, carbs: 1, fat: 1 },
+  cookingTip: 'Baking keeps macros close to raw values with a firmer texture.',
+});
+
+const cookGrilled = (prepTimeMinutes = 5, cookTimeMinutes = 12, recommendedTempF = 450): CookingOption => ({
+  method: 'grilled',
+  prepTimeMinutes,
+  cookTimeMinutes,
+  recommendedTempF,
+  macroMultiplier: { calories: 0.95, protein: 1, carbs: 1, fat: 0.85 },
+  cookingTip: 'Grilling lets excess fat drip away as it cooks.',
+});
+
+const cookPanFried = (prepTimeMinutes = 5, cookTimeMinutes = 10, addedFatGrams = 7): CookingOption => ({
+  method: 'pan_fried',
+  prepTimeMinutes,
+  cookTimeMinutes,
+  macroMultiplier: { calories: 1.2, protein: 1, carbs: 1, fat: 1.5 },
+  addedFatGrams,
+  cookingTip: 'Pan frying adds calories and fat from the cooking oil or butter.',
+});
+
+const cookAirFried = (prepTimeMinutes = 5, cookTimeMinutes = 15, recommendedTempF = 380): CookingOption => ({
+  method: 'air_fried',
+  prepTimeMinutes,
+  cookTimeMinutes,
+  recommendedTempF,
+  macroMultiplier: { calories: 1.05, protein: 1, carbs: 1, fat: 1.1 },
+  addedFatGrams: 1,
+  cookingTip: 'Air frying uses little to no added oil for a crisp texture.',
+});
+
+// Convenience factory for dietary safeguard metadata, defaults to "no known triggers"
+const tags = (overrides: Partial<DietaryTags> = {}): DietaryTags => ({
+  allergens: [],
+  isHighFodmap: false,
+  isGerdTrigger: false,
+  containsGluten: false,
+  containsLactose: false,
+  spiceLevel: 'none',
+  ...overrides,
+});
+
 export const FOOD_CATALOG: CatalogFoodItem[] = [
   // ---- Protein ----
   {
@@ -14,6 +105,9 @@ export const FOOD_CATALOG: CatalogFoodItem[] = [
     barcode: '0001112223334',
     name: 'Egg Whites (Scrambled)',
     category: 'protein',
+    imageUrl: 'https://images.unsplash.com/photo-1482049016688-2d3e1b311543?w=800&q=80&auto=format&fit=crop',
+    cookingOptions: [cookSteamed(2, 5), cookPanFried(2, 4, 3)],
+    dietaryTags: tags({ allergens: ['eggs'] }),
     portionRaw: '150g (raw liquid)',
     caloriesRaw: 78,
     portionCooked: '120g (cooked)',
@@ -22,7 +116,7 @@ export const FOOD_CATALOG: CatalogFoodItem[] = [
     carbGrams: 2,
     fatGrams: 0.5,
     snackProfile: ['high_protein'],
-    estimatedPrices: { walmart: 2.5, foodLion: 2.8, aldi: 2.2, kroger: 2.7 },
+    estimatedPrices: buildStorePrices(2.5),
     mealWindows: ['breakfast'],
   },
   {
@@ -30,6 +124,9 @@ export const FOOD_CATALOG: CatalogFoodItem[] = [
     barcode: '0003334445556',
     name: 'Grilled Chicken Breast',
     category: 'protein',
+    imageUrl: 'https://images.unsplash.com/photo-1532550907401-a500c9a57435?w=800&q=80&auto=format&fit=crop',
+    cookingOptions: [cookGrilled(5, 12, 450), cookBaked(5, 25, 400), cookAirFried(5, 18, 380)],
+    dietaryTags: tags(),
     portionRaw: '170g (raw)',
     caloriesRaw: 187,
     portionCooked: '130g (cooked)',
@@ -38,7 +135,7 @@ export const FOOD_CATALOG: CatalogFoodItem[] = [
     carbGrams: 0,
     fatGrams: 5,
     snackProfile: ['high_protein', 'savory'],
-    estimatedPrices: { walmart: 3.5, foodLion: 3.9, aldi: 3.2, kroger: 3.7 },
+    estimatedPrices: buildStorePrices(3.5),
     mealWindows: ['lunch', 'dinner'],
   },
   {
@@ -46,6 +143,9 @@ export const FOOD_CATALOG: CatalogFoodItem[] = [
     barcode: '0005556667778',
     name: 'Baked Salmon Fillet',
     category: 'protein',
+    imageUrl: 'https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?w=800&q=80&auto=format&fit=crop',
+    cookingOptions: [cookBaked(5, 18, 400), cookGrilled(5, 10, 450), cookPanFried(5, 8, 5)],
+    dietaryTags: tags({ allergens: ['fish'] }),
     portionRaw: '160g (raw)',
     caloriesRaw: 233,
     portionCooked: '125g (cooked)',
@@ -54,7 +154,7 @@ export const FOOD_CATALOG: CatalogFoodItem[] = [
     carbGrams: 0,
     fatGrams: 13,
     snackProfile: ['savory', 'high_protein'],
-    estimatedPrices: { walmart: 6.5, foodLion: 7.2, aldi: 5.9, kroger: 6.8 },
+    estimatedPrices: buildStorePrices(6.5),
     mealWindows: ['dinner'],
   },
   {
@@ -62,6 +162,9 @@ export const FOOD_CATALOG: CatalogFoodItem[] = [
     barcode: '0001122334455',
     name: 'Roasted Turkey Breast',
     category: 'protein',
+    imageUrl: CATEGORY_FALLBACK_IMAGE.protein,
+    cookingOptions: [cookBaked(5, 30, 375), cookGrilled(5, 14, 450)],
+    dietaryTags: tags(),
     portionRaw: '170g (raw)',
     caloriesRaw: 180,
     portionCooked: '135g (cooked)',
@@ -70,7 +173,7 @@ export const FOOD_CATALOG: CatalogFoodItem[] = [
     carbGrams: 0,
     fatGrams: 3,
     snackProfile: ['high_protein', 'savory'],
-    estimatedPrices: { walmart: 3.9, foodLion: 4.3, aldi: 3.6, kroger: 4.1 },
+    estimatedPrices: buildStorePrices(3.9),
     mealWindows: ['lunch', 'dinner'],
   },
   {
@@ -78,6 +181,9 @@ export const FOOD_CATALOG: CatalogFoodItem[] = [
     barcode: '0002233445566',
     name: 'Firm Tofu Cubes',
     category: 'protein',
+    imageUrl: CATEGORY_FALLBACK_IMAGE.protein,
+    cookingOptions: [cookPanFried(5, 8, 6), cookAirFried(5, 15, 380), cookSteamed(3, 8)],
+    dietaryTags: tags({ allergens: ['soy'] }),
     portionRaw: '150g (raw)',
     caloriesRaw: 120,
     portionCooked: '140g (cooked)',
@@ -86,7 +192,7 @@ export const FOOD_CATALOG: CatalogFoodItem[] = [
     carbGrams: 3,
     fatGrams: 7,
     snackProfile: ['high_protein', 'savory'],
-    estimatedPrices: { walmart: 1.8, foodLion: 2.0, aldi: 1.6, kroger: 1.9 },
+    estimatedPrices: buildStorePrices(1.8),
     mealWindows: ['lunch', 'dinner'],
   },
   // ---- Carb ----
@@ -95,6 +201,9 @@ export const FOOD_CATALOG: CatalogFoodItem[] = [
     barcode: '0002223334445',
     name: 'Oatmeal with Berries',
     category: 'carb',
+    imageUrl: 'https://images.unsplash.com/photo-1517673132405-a56a62b18caf?w=800&q=80&auto=format&fit=crop',
+    cookingOptions: [cookBoiled(1, 5)],
+    dietaryTags: tags(),
     portionRaw: '50g (dry oats)',
     caloriesRaw: 190,
     portionCooked: '220g (cooked)',
@@ -103,7 +212,7 @@ export const FOOD_CATALOG: CatalogFoodItem[] = [
     carbGrams: 34,
     fatGrams: 3,
     snackProfile: ['sweet'],
-    estimatedPrices: { walmart: 1.2, foodLion: 1.4, aldi: 1.0, kroger: 1.3 },
+    estimatedPrices: buildStorePrices(1.2),
     mealWindows: ['breakfast'],
   },
   {
@@ -111,6 +220,9 @@ export const FOOD_CATALOG: CatalogFoodItem[] = [
     barcode: '0004445556667',
     name: 'Brown Rice',
     category: 'carb',
+    imageUrl: 'https://images.unsplash.com/photo-1516684732162-798a0062be99?w=800&q=80&auto=format&fit=crop',
+    cookingOptions: [cookBoiled(2, 35)],
+    dietaryTags: tags(),
     portionRaw: '90g (raw)',
     caloriesRaw: 325,
     portionCooked: '195g (cooked)',
@@ -119,7 +231,7 @@ export const FOOD_CATALOG: CatalogFoodItem[] = [
     carbGrams: 45,
     fatGrams: 1.8,
     snackProfile: ['savory'],
-    estimatedPrices: { walmart: 0.9, foodLion: 1.0, aldi: 0.7, kroger: 0.95 },
+    estimatedPrices: buildStorePrices(0.9),
     mealWindows: ['lunch', 'dinner'],
   },
   {
@@ -127,6 +239,9 @@ export const FOOD_CATALOG: CatalogFoodItem[] = [
     barcode: '0003344556677',
     name: 'Roasted Sweet Potato',
     category: 'carb',
+    imageUrl: CATEGORY_FALLBACK_IMAGE.carb,
+    cookingOptions: [cookBaked(5, 45, 400), cookBoiled(5, 20), cookAirFried(5, 20, 400)],
+    dietaryTags: tags(),
     portionRaw: '200g (raw)',
     caloriesRaw: 172,
     portionCooked: '160g (cooked)',
@@ -135,7 +250,7 @@ export const FOOD_CATALOG: CatalogFoodItem[] = [
     carbGrams: 35,
     fatGrams: 0.2,
     snackProfile: ['sweet', 'savory'],
-    estimatedPrices: { walmart: 1.0, foodLion: 1.1, aldi: 0.85, kroger: 1.05 },
+    estimatedPrices: buildStorePrices(1.0),
     mealWindows: ['lunch', 'dinner'],
   },
   {
@@ -143,6 +258,9 @@ export const FOOD_CATALOG: CatalogFoodItem[] = [
     barcode: '0004455667788',
     name: 'Whole Wheat Toast',
     category: 'carb',
+    imageUrl: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&q=80&auto=format&fit=crop',
+    cookingOptions: [cookBaked(0, 3, 400)],
+    dietaryTags: tags({ allergens: ['wheat'], containsGluten: true, isHighFodmap: true }),
     portionRaw: '2 slices (70g)',
     caloriesRaw: 170,
     portionCooked: '2 slices, toasted (65g)',
@@ -151,7 +269,7 @@ export const FOOD_CATALOG: CatalogFoodItem[] = [
     carbGrams: 30,
     fatGrams: 2,
     snackProfile: ['savory'],
-    estimatedPrices: { walmart: 0.6, foodLion: 0.7, aldi: 0.5, kroger: 0.65 },
+    estimatedPrices: buildStorePrices(0.6),
     mealWindows: ['breakfast'],
   },
   // ---- Fat ----
@@ -160,6 +278,9 @@ export const FOOD_CATALOG: CatalogFoodItem[] = [
     barcode: '0005566778899',
     name: 'Raw Almonds',
     category: 'fat',
+    imageUrl: 'https://images.unsplash.com/photo-1508061253366-f7da158b6d46?w=800&q=80&auto=format&fit=crop',
+    cookingOptions: [cookRaw(), cookBaked(2, 10, 325)],
+    dietaryTags: tags({ allergens: ['tree_nuts'] }),
     portionRaw: '28g',
     caloriesRaw: 164,
     portionCooked: '28g (roasted)',
@@ -168,7 +289,7 @@ export const FOOD_CATALOG: CatalogFoodItem[] = [
     carbGrams: 6,
     fatGrams: 14,
     snackProfile: ['crunchy', 'salty', 'high_protein'],
-    estimatedPrices: { walmart: 1.3, foodLion: 1.5, aldi: 1.1, kroger: 1.4 },
+    estimatedPrices: buildStorePrices(1.3),
     mealWindows: ['snacks'],
   },
   {
@@ -176,6 +297,9 @@ export const FOOD_CATALOG: CatalogFoodItem[] = [
     barcode: '0006677889900',
     name: 'Avocado (Half)',
     category: 'fat',
+    imageUrl: 'https://images.unsplash.com/photo-1523049673857-eb18f1d7b578?w=800&q=80&auto=format&fit=crop',
+    cookingOptions: [cookRaw()],
+    dietaryTags: tags({ isHighFodmap: true }),
     portionRaw: '100g (raw)',
     caloriesRaw: 160,
     portionCooked: '95g (grilled)',
@@ -184,7 +308,7 @@ export const FOOD_CATALOG: CatalogFoodItem[] = [
     carbGrams: 9,
     fatGrams: 15,
     snackProfile: ['savory'],
-    estimatedPrices: { walmart: 0.9, foodLion: 1.0, aldi: 0.75, kroger: 0.95 },
+    estimatedPrices: buildStorePrices(0.9),
     mealWindows: ['lunch', 'dinner'],
   },
   {
@@ -192,6 +316,9 @@ export const FOOD_CATALOG: CatalogFoodItem[] = [
     barcode: '0007788990011',
     name: 'Peanut Butter (2 tbsp)',
     category: 'fat',
+    imageUrl: CATEGORY_FALLBACK_IMAGE.fat,
+    cookingOptions: [cookRaw()],
+    dietaryTags: tags({ allergens: ['peanuts'] }),
     portionRaw: '32g',
     caloriesRaw: 190,
     portionCooked: '32g',
@@ -200,7 +327,7 @@ export const FOOD_CATALOG: CatalogFoodItem[] = [
     carbGrams: 6,
     fatGrams: 16,
     snackProfile: ['sweet', 'savory', 'high_protein'],
-    estimatedPrices: { walmart: 1.4, foodLion: 1.6, aldi: 1.2, kroger: 1.5 },
+    estimatedPrices: buildStorePrices(1.4),
     mealWindows: ['snacks'],
   },
   // ---- Vegetable ----
@@ -209,6 +336,9 @@ export const FOOD_CATALOG: CatalogFoodItem[] = [
     barcode: '0006667778889',
     name: 'Roasted Mixed Vegetables',
     category: 'vegetable',
+    imageUrl: 'https://images.unsplash.com/photo-1466637574441-749b8f19452f?w=800&q=80&auto=format&fit=crop',
+    cookingOptions: [cookBaked(10, 25, 425), cookAirFried(8, 15, 400)],
+    dietaryTags: tags({ isHighFodmap: true, isGerdTrigger: true, spiceLevel: 'medium' }),
     portionRaw: '200g (raw)',
     caloriesRaw: 90,
     portionCooked: '150g (cooked)',
@@ -217,7 +347,7 @@ export const FOOD_CATALOG: CatalogFoodItem[] = [
     carbGrams: 18,
     fatGrams: 2,
     snackProfile: ['savory', 'crunchy'],
-    estimatedPrices: { walmart: 1.8, foodLion: 2.0, aldi: 1.6, kroger: 1.9 },
+    estimatedPrices: buildStorePrices(1.8),
     mealWindows: ['lunch', 'dinner'],
   },
   {
@@ -225,6 +355,9 @@ export const FOOD_CATALOG: CatalogFoodItem[] = [
     barcode: '0008899001122',
     name: 'Steamed Broccoli',
     category: 'vegetable',
+    imageUrl: 'https://images.unsplash.com/photo-1459411621453-7b03977f4bfc?w=800&q=80&auto=format&fit=crop',
+    cookingOptions: [cookSteamed(2, 6), cookBoiled(2, 5), cookBaked(5, 20, 425)],
+    dietaryTags: tags({ isHighFodmap: true }),
     portionRaw: '180g (raw)',
     caloriesRaw: 61,
     portionCooked: '160g (steamed)',
@@ -233,7 +366,7 @@ export const FOOD_CATALOG: CatalogFoodItem[] = [
     carbGrams: 11,
     fatGrams: 0.6,
     snackProfile: ['savory', 'crunchy'],
-    estimatedPrices: { walmart: 1.2, foodLion: 1.3, aldi: 1.0, kroger: 1.25 },
+    estimatedPrices: buildStorePrices(1.2),
     mealWindows: ['lunch', 'dinner'],
   },
   {
@@ -241,6 +374,9 @@ export const FOOD_CATALOG: CatalogFoodItem[] = [
     barcode: '0009900112233',
     name: 'Spinach Salad Mix',
     category: 'vegetable',
+    imageUrl: 'https://images.unsplash.com/photo-1576045057995-568f588f82fb?w=800&q=80&auto=format&fit=crop',
+    cookingOptions: [cookRaw(), cookPanFried(2, 3, 2)],
+    dietaryTags: tags(),
     portionRaw: '85g (raw)',
     caloriesRaw: 20,
     portionCooked: '75g (sauteed)',
@@ -249,7 +385,7 @@ export const FOOD_CATALOG: CatalogFoodItem[] = [
     carbGrams: 3,
     fatGrams: 0.3,
     snackProfile: ['savory'],
-    estimatedPrices: { walmart: 2.0, foodLion: 2.2, aldi: 1.8, kroger: 2.1 },
+    estimatedPrices: buildStorePrices(2.0),
     mealWindows: ['lunch', 'dinner'],
   },
   // ---- Snack ----
@@ -258,6 +394,9 @@ export const FOOD_CATALOG: CatalogFoodItem[] = [
     barcode: '0007778889990',
     name: 'Mini Pretzels',
     category: 'snack',
+    imageUrl: CATEGORY_FALLBACK_IMAGE.snack,
+    cookingOptions: [cookRaw()],
+    dietaryTags: tags({ allergens: ['wheat'], containsGluten: true }),
     portionRaw: '30g',
     caloriesRaw: 110,
     portionCooked: '30g',
@@ -266,7 +405,7 @@ export const FOOD_CATALOG: CatalogFoodItem[] = [
     carbGrams: 23,
     fatGrams: 1,
     snackProfile: ['salty', 'crunchy'],
-    estimatedPrices: { walmart: 0.6, foodLion: 0.7, aldi: 0.5, kroger: 0.65 },
+    estimatedPrices: buildStorePrices(0.6),
     mealWindows: ['snacks'],
   },
   {
@@ -274,6 +413,9 @@ export const FOOD_CATALOG: CatalogFoodItem[] = [
     barcode: '0008889990001',
     name: 'Greek Yogurt Cup',
     category: 'snack',
+    imageUrl: 'https://images.unsplash.com/photo-1488477181946-6428a0291777?w=800&q=80&auto=format&fit=crop',
+    cookingOptions: [cookRaw()],
+    dietaryTags: tags({ allergens: ['milk'], containsLactose: true }),
     portionRaw: '170g',
     caloriesRaw: 100,
     portionCooked: '170g',
@@ -282,7 +424,7 @@ export const FOOD_CATALOG: CatalogFoodItem[] = [
     carbGrams: 6,
     fatGrams: 0,
     snackProfile: ['high_protein', 'sweet'],
-    estimatedPrices: { walmart: 1.1, foodLion: 1.3, aldi: 0.9, kroger: 1.2 },
+    estimatedPrices: buildStorePrices(1.1),
     mealWindows: ['snacks'],
   },
   {
@@ -290,6 +432,9 @@ export const FOOD_CATALOG: CatalogFoodItem[] = [
     barcode: '0009990001112',
     name: 'Trail Mix',
     category: 'snack',
+    imageUrl: CATEGORY_FALLBACK_IMAGE.snack,
+    cookingOptions: [cookRaw()],
+    dietaryTags: tags({ allergens: ['tree_nuts', 'peanuts'] }),
     portionRaw: '40g',
     caloriesRaw: 190,
     portionCooked: '40g',
@@ -298,7 +443,7 @@ export const FOOD_CATALOG: CatalogFoodItem[] = [
     carbGrams: 17,
     fatGrams: 12,
     snackProfile: ['sweet', 'crunchy', 'savory'],
-    estimatedPrices: { walmart: 1.5, foodLion: 1.7, aldi: 1.3, kroger: 1.6 },
+    estimatedPrices: buildStorePrices(1.5),
     mealWindows: ['snacks'],
   },
   {
@@ -306,6 +451,9 @@ export const FOOD_CATALOG: CatalogFoodItem[] = [
     barcode: '0000112223335',
     name: 'Beef Jerky',
     category: 'snack',
+    imageUrl: CATEGORY_FALLBACK_IMAGE.snack,
+    cookingOptions: [cookRaw()],
+    dietaryTags: tags({ allergens: ['soy'], isGerdTrigger: true, spiceLevel: 'mild' }),
     portionRaw: '28g',
     caloriesRaw: 80,
     portionCooked: '28g',
@@ -314,7 +462,7 @@ export const FOOD_CATALOG: CatalogFoodItem[] = [
     carbGrams: 3,
     fatGrams: 1.5,
     snackProfile: ['salty', 'savory', 'high_protein'],
-    estimatedPrices: { walmart: 1.9, foodLion: 2.2, aldi: 1.7, kroger: 2.1 },
+    estimatedPrices: buildStorePrices(1.9),
     mealWindows: ['snacks'],
   },
   {
@@ -322,6 +470,9 @@ export const FOOD_CATALOG: CatalogFoodItem[] = [
     barcode: '0001223344556',
     name: 'Salted Rice Cakes',
     category: 'snack',
+    imageUrl: CATEGORY_FALLBACK_IMAGE.snack,
+    cookingOptions: [cookRaw()],
+    dietaryTags: tags({ allergens: ['wheat'], containsGluten: true }),
     portionRaw: '2 cakes (18g)',
     caloriesRaw: 70,
     portionCooked: '2 cakes (18g)',
@@ -330,7 +481,74 @@ export const FOOD_CATALOG: CatalogFoodItem[] = [
     carbGrams: 15,
     fatGrams: 0.5,
     snackProfile: ['salty', 'crunchy'],
-    estimatedPrices: { walmart: 0.5, foodLion: 0.6, aldi: 0.4, kroger: 0.55 },
+    estimatedPrices: buildStorePrices(0.5),
     mealWindows: ['snacks'],
   },
 ];
+
+export interface SafeSwapSuggestion {
+  /** Present when the alternative is itself a catalog item (id reference) */
+  alternativeFoodId?: string;
+  alternativeName: string;
+  reason: string;
+}
+
+// One-click "safe swap" suggestions for foods commonly flagged by allergy/GI warnings
+export const SAFE_SWAPS: Record<string, SafeSwapSuggestion> = {
+  'greek-yogurt': {
+    alternativeName: 'Coconut Yogurt (Dairy-Free)',
+    reason: 'Lactose-free, plant-based yogurt with a similar protein profile.',
+  },
+  'whole-wheat-bread': {
+    alternativeName: 'Certified Gluten-Free Bread',
+    reason: 'Gluten-free toast alternative with comparable carbs.',
+  },
+  'peanut-butter': {
+    alternativeName: 'Sunflower Seed Butter',
+    reason: 'Nut-free spread with a similar fat and protein profile.',
+  },
+  almonds: {
+    alternativeName: 'Roasted Pumpkin Seeds',
+    reason: 'Nut-free, crunchy snack with comparable healthy fats.',
+  },
+  tofu: {
+    alternativeFoodId: 'grilled-chicken',
+    alternativeName: 'Grilled Chicken Breast',
+    reason: 'Soy-free protein with a similar calorie and protein profile.',
+  },
+  salmon: {
+    alternativeFoodId: 'grilled-chicken',
+    alternativeName: 'Grilled Chicken Breast',
+    reason: 'Fish-free protein alternative with comparable protein.',
+  },
+  'roasted-veggies': {
+    alternativeFoodId: 'spinach-salad',
+    alternativeName: 'Spinach Salad Mix',
+    reason: 'Garlic-free, low-FODMAP, and milder on GERD symptoms.',
+  },
+  broccoli: {
+    alternativeFoodId: 'spinach-salad',
+    alternativeName: 'Spinach Salad Mix',
+    reason: 'Lower-FODMAP vegetable option for sensitive stomachs.',
+  },
+  'trail-mix': {
+    alternativeFoodId: 'rice-cakes',
+    alternativeName: 'Salted Rice Cakes',
+    reason: 'Nut-free crunchy snack alternative.',
+  },
+  pretzels: {
+    alternativeFoodId: 'rice-cakes',
+    alternativeName: 'Salted Rice Cakes',
+    reason: 'Gluten-free crunchy snack alternative.',
+  },
+  jerky: {
+    alternativeFoodId: 'greek-yogurt',
+    alternativeName: 'Greek Yogurt Cup',
+    reason: 'Soy-free, milder high-protein snack.',
+  },
+};
+
+/** Look up a gut/allergy-friendly swap suggestion for a catalog food, if one exists. */
+export function getSafeSwap(foodId: string): SafeSwapSuggestion | undefined {
+  return SAFE_SWAPS[foodId];
+}

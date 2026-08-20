@@ -1,1 +1,0 @@
-self.__REACT_LOADABLE_MANIFEST='{"src/components/BarcodeScannerModal.tsx -> html5-qrcode":{"id":5903,"files":["static/chunks/7cb1fa1f.2a13a1b299fc922a.js","static/chunks/903.2089b91625d43f1f.js"]}}';
