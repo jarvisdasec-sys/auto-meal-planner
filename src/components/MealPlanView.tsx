@@ -22,9 +22,11 @@ import {
   TIME_BUDGET_LABELS,
 } from '@/lib/pantryPlanner';
 import type { TimeBudget } from '@/lib/pantryPlanner';
+import { DEFAULT_FOOD_IMAGE } from '@/lib/imageFallback';
 import Card from './ui/Card';
 import ScanBarcodeButton from './ScanBarcodeButton';
 import CookingMethodControls from './CookingMethodControls';
+import LogFoodModal, { type LogFoodInput } from './LogFoodModal';
 
 const MEAL_LABELS: Record<MealWindow, string> = {
   breakfast: 'Breakfast',
@@ -43,6 +45,7 @@ export default function MealPlanView() {
   const logFood = useMealPlannerStore((s) => s.logFood);
   const [portionMode, setPortionMode] = useState<PortionMode>('raw');
   const [timeBudget, setTimeBudget] = useState<TimeBudget>('standard_30');
+  const [logFoodOpen, setLogFoodOpen] = useState(false);
 
   const summary = useMemo(() => calculateMetabolicSummary(profile), [profile]);
   const mealSplit = useMemo(() => splitCaloriesAcrossMeals(summary.targetCalories), [summary.targetCalories]);
@@ -64,6 +67,13 @@ export default function MealPlanView() {
 
   return (
     <div className="space-y-6">
+      <button
+        onClick={() => setLogFoodOpen(true)}
+        className="w-full rounded-xl bg-accent-green/90 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-accent-green/20 transition-colors hover:bg-accent-green"
+      >
+        + Log Food / Meal
+      </button>
+
       <Card title="Quick Log" subtitle="Scan a barcode or add a custom food directly to today's log">
         <ScanBarcodeButton />
       </Card>
@@ -171,6 +181,23 @@ export default function MealPlanView() {
           )}
         </Card>
       ))}
+
+      <LogFoodModal
+        open={logFoodOpen}
+        onClose={() => setLogFoodOpen(false)}
+        onSave={(input: LogFoodInput) =>
+          logFood(
+            `manual-${crypto.randomUUID()}`,
+            input.name,
+            input.calories,
+            'raw',
+            'raw',
+            undefined,
+            input.mealType,
+            { proteinGrams: input.proteinGrams, carbGrams: input.carbGrams, fatGrams: input.fatGrams },
+          )
+        }
+      />
     </div>
   );
 }
@@ -209,8 +236,17 @@ function FoodItemCard({
   const totalFat = Math.round((adjusted.fatGrams + (oil?.addedFatGrams ?? 0)) * 10) / 10;
 
   return (
-    <div className="flex flex-col justify-between rounded-xl border border-surface-border bg-white/5 p-4">
-      <div className="space-y-2">
+    <div className="flex flex-col justify-between overflow-hidden rounded-xl border border-surface-border bg-white/5">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={food.imageUrl || DEFAULT_FOOD_IMAGE}
+        alt={food.name}
+        onError={(e) => {
+          e.currentTarget.src = DEFAULT_FOOD_IMAGE;
+        }}
+        className="object-cover w-full h-48 rounded-t-xl"
+      />
+      <div className="space-y-2 p-4">
         <h4 className="text-sm font-semibold text-slate-100">{food.name}</h4>
         <p className="text-xs text-slate-400">
           {portionMode === 'raw' ? 'Raw' : 'Cooked'} portion: {portion}
@@ -288,7 +324,7 @@ function FoodItemCard({
               : undefined,
           })
         }
-        className="mt-3 rounded-lg bg-accent/90 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-accent"
+        className="mx-4 mb-4 mt-3 rounded-lg bg-accent/90 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-accent"
       >
         Log Food
       </button>

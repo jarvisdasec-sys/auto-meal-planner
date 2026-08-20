@@ -9,6 +9,7 @@ import ScanBarcodeButton from './ScanBarcodeButton';
 import CookingMethodControls from './CookingMethodControls';
 import EatingOutModal from './EatingOutModal';
 import HydrationTracker from './HydrationTracker';
+import LogFoodModal, { type LogFoodInput } from './LogFoodModal';
 
 export default function EnergyTracker() {
   const profile = useMealPlannerStore((s) => s.profile);
@@ -29,9 +30,27 @@ export default function EnergyTracker() {
   const [durationMinutes, setDurationMinutes] = useState('');
   const [caloriesBurned, setCaloriesBurned] = useState('');
   const [eatingOutOpen, setEatingOutOpen] = useState(false);
+  const [logFoodOpen, setLogFoodOpen] = useState(false);
 
   const summary = useMemo(() => calculateMetabolicSummary(profile), [profile]);
   const adjustedTargetCalories = summary.targetCalories - (calorieAdjustmentPlan?.dailyOffset ?? 0);
+
+  const todayMacros = useMemo(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    return loggedFoods
+      .filter((entry) => entry.timestamp.slice(0, 10) === today)
+      .reduce(
+        (totals, entry) => {
+          const food = foodCatalog.find((f) => f.id === entry.foodId);
+          return {
+            proteinGrams: totals.proteinGrams + (entry.proteinGrams ?? food?.proteinGrams ?? 0),
+            carbGrams: totals.carbGrams + (entry.carbGrams ?? food?.carbGrams ?? 0),
+            fatGrams: totals.fatGrams + (entry.fatGrams ?? food?.fatGrams ?? 0),
+          };
+        },
+        { proteinGrams: 0, carbGrams: 0, fatGrams: 0 },
+      );
+  }, [loggedFoods, foodCatalog]);
 
   const snapshot = useMemo(
     () =>
@@ -63,6 +82,12 @@ export default function EnergyTracker() {
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
       <Card title="Energy Balance" className="lg:col-span-2">
         <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => setLogFoodOpen(true)}
+            className="rounded-lg bg-accent-green/90 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-accent-green/20 transition-colors hover:bg-accent-green"
+          >
+            + Log Food / Meal
+          </button>
           <ScanBarcodeButton />
           <button
             onClick={() => setEatingOutOpen(true)}
@@ -95,6 +120,12 @@ export default function EnergyTracker() {
           />
         </div>
 
+        <div className="mt-3 grid grid-cols-3 gap-3">
+          <StatBox label="Protein Today" value={`${Math.round(todayMacros.proteinGrams)}g`} />
+          <StatBox label="Carbs Today" value={`${Math.round(todayMacros.carbGrams)}g`} />
+          <StatBox label="Fat Today" value={`${Math.round(todayMacros.fatGrams)}g`} />
+        </div>
+
         <div className="mt-6">
           <h4 className="mb-2 text-sm font-semibold text-slate-200">Logged Foods</h4>
           {loggedFoods.length === 0 ? (
@@ -109,6 +140,11 @@ export default function EnergyTracker() {
                     <div className="flex items-center justify-between">
                       <span className="text-slate-200">
                         {entry.name} <span className="text-slate-500">({entry.portionMode})</span>
+                        {entry.mealType && (
+                          <span className="ml-2 rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-semibold uppercase text-accent">
+                            {formatLabel(entry.mealType)}
+                          </span>
+                        )}
                       </span>
                       <div className="flex items-center gap-3">
                         <span className="font-semibold text-accent-green">{entry.calories} kcal</span>
@@ -276,6 +312,23 @@ export default function EnergyTracker() {
           if (adjustmentPlan) setCalorieAdjustmentPlan(adjustmentPlan);
           setEatingOutOpen(false);
         }}
+      />
+
+      <LogFoodModal
+        open={logFoodOpen}
+        onClose={() => setLogFoodOpen(false)}
+        onSave={(input: LogFoodInput) =>
+          logFood(
+            `manual-${crypto.randomUUID()}`,
+            input.name,
+            input.calories,
+            'raw',
+            'raw',
+            undefined,
+            input.mealType,
+            { proteinGrams: input.proteinGrams, carbGrams: input.carbGrams, fatGrams: input.fatGrams },
+          )
+        }
       />
     </div>
   );

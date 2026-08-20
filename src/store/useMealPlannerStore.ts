@@ -13,6 +13,7 @@ import type {
   GICondition,
   SpiceLevel,
   SmoothAdjustmentPlan,
+  MealWindow,
 } from '../lib/fitnessMealPlanner';
 import { applyCookingOption, calculateAddedOilCalories, requiresOilInput } from '../lib/fitnessMealPlanner';
 import { FOOD_CATALOG, type CatalogFoodItem } from '../lib/foodCatalog';
@@ -25,6 +26,10 @@ export interface LoggedFoodEntry {
   portionMode: 'raw' | 'cooked';
   cookingMethod: CookingMethod;
   oilAddition?: OilAddition;
+  mealType?: MealWindow;
+  proteinGrams?: number;
+  carbGrams?: number;
+  fatGrams?: number;
   timestamp: string;
 }
 
@@ -89,6 +94,8 @@ interface MealPlannerState {
     portionMode: 'raw' | 'cooked',
     cookingMethod: CookingMethod,
     oilAddition?: OilAddition,
+    mealType?: MealWindow,
+    macros?: { proteinGrams: number; carbGrams: number; fatGrams: number },
   ) => void;
   removeLoggedFood: (id: string) => void;
   updateLoggedFoodCooking: (
@@ -164,7 +171,7 @@ export const useMealPlannerStore = create<MealPlannerState>((set, get) => ({
   removeExerciseLog: (id) =>
     set((state) => ({ exerciseLogs: state.exerciseLogs.filter((log) => log.id !== id) })),
 
-  logFood: (foodId, name, calories, portionMode, cookingMethod, oilAddition) =>
+  logFood: (foodId, name, calories, portionMode, cookingMethod, oilAddition, mealType, macros) =>
     set((state) => ({
       loggedFoods: [
         ...state.loggedFoods,
@@ -176,6 +183,10 @@ export const useMealPlannerStore = create<MealPlannerState>((set, get) => ({
           portionMode,
           cookingMethod,
           oilAddition,
+          mealType,
+          proteinGrams: macros?.proteinGrams,
+          carbGrams: macros?.carbGrams,
+          fatGrams: macros?.fatGrams,
           timestamp: new Date().toISOString(),
         },
       ],

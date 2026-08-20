@@ -4,8 +4,9 @@ import { useMemo, useState } from 'react';
 import { useMealPlannerStore } from '@/store/useMealPlannerStore';
 import { compareRawAndCookedCalories, getDietaryWarnings } from '@/lib/fitnessMealPlanner';
 import type { CookingOption, DietaryWarning, MealWindow } from '@/lib/fitnessMealPlanner';
-import { CATEGORY_FALLBACK_ICON, CATEGORY_FALLBACK_IMAGE } from '@/lib/foodCatalog';
+import { CATEGORY_FALLBACK_ICON } from '@/lib/foodCatalog';
 import type { CatalogFoodItem } from '@/lib/foodCatalog';
+import { DEFAULT_FOOD_IMAGE } from '@/lib/imageFallback';
 import { formatLabel } from '@/lib/format';
 import Card from './ui/Card';
 
@@ -158,26 +159,21 @@ function PortionPhotoCard({
   cookingOption?: CookingOption;
   warnings?: DietaryWarning[];
 }) {
-  const [imageFailed, setImageFailed] = useState(false);
-  const resolvedImageUrl = imageUrl ?? (category ? CATEGORY_FALLBACK_IMAGE[category] : undefined);
+  const resolvedImageUrl = imageUrl || DEFAULT_FOOD_IMAGE;
   const hasMacros = proteinGrams !== undefined || carbGrams !== undefined || fatGrams !== undefined;
 
   return (
     <div className="overflow-hidden rounded-xl border border-surface-border bg-white/5">
-      <div className="relative aspect-square w-full overflow-hidden bg-gradient-to-br from-white/10 to-white/0">
-        {resolvedImageUrl && !imageFailed ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={resolvedImageUrl}
-            alt={name}
-            className="h-full w-full object-cover"
-            onError={() => setImageFailed(true)}
-          />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center text-5xl">
-            <span aria-hidden>{category ? CATEGORY_FALLBACK_ICON[category] : '🍽️'}</span>
-          </div>
-        )}
+      <div className="relative w-full overflow-hidden bg-gradient-to-br from-white/10 to-white/0">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={resolvedImageUrl}
+          alt={name}
+          onError={(e) => {
+            e.currentTarget.src = DEFAULT_FOOD_IMAGE;
+          }}
+          className="object-cover w-full h-48 rounded-t-xl"
+        />
         <div className="absolute bottom-2 right-2 rounded-lg bg-black/70 px-2 py-1 text-right text-xs font-semibold text-accent-green backdrop-blur">
           <div>{Math.round(calories)} kcal</div>
           {hasMacros && (
