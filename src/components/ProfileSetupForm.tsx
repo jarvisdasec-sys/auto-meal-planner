@@ -93,6 +93,13 @@ export default function ProfileSetupForm() {
     setCustomExclusions(profile.customExclusions.filter((item) => item !== value));
   };
 
+  const [isSaved, setIsSaved] = useState(false);
+
+  const handleSaveProfile = () => {
+    setIsSaved(true);
+    setTimeout(() => setIsSaved(false), 3000);
+  };
+
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
       <Card title="Your Profile" subtitle="Update your stats to recalculate targets live" className="lg:col-span-3">
@@ -225,6 +232,18 @@ export default function ProfileSetupForm() {
             </div>
           </Field>
         </div>
+
+        <button
+          type="button"
+          onClick={handleSaveProfile}
+          className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-accent px-4 py-3 font-semibold text-white shadow-lg shadow-accent/30 transition-colors duration-200 hover:bg-accent/90"
+        >
+          {isSaved ? (
+            <span className="flex items-center gap-2">✓ Profile Saved!</span>
+          ) : (
+            'Save Profile Changes'
+          )}
+        </button>
       </Card>
 
       <div className="space-y-6 lg:col-span-2">

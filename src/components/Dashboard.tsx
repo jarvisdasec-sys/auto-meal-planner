@@ -6,6 +6,7 @@ import MealPlanView from './MealPlanView';
 import EnergyTracker from './EnergyTracker';
 import GroceryEstimator from './GroceryEstimator';
 import PortionGallery from './PortionGallery';
+import HistoryTracker from './HistoryTracker';
 
 const TABS = [
   { id: 'profile', label: 'Profile Setup' },
@@ -13,6 +14,7 @@ const TABS = [
   { id: 'tracker', label: 'Live Calorie Tracker' },
   { id: 'grocery', label: 'Grocery Estimator' },
   { id: 'portion', label: 'Portion' },
+  { id: 'history', label: 'History' },
 ] as const;
 
 type TabId = (typeof TABS)[number]['id'];
@@ -53,6 +55,7 @@ export default function Dashboard() {
         {activeTab === 'tracker' && <EnergyTracker />}
         {activeTab === 'grocery' && <GroceryEstimator />}
         {activeTab === 'portion' && <PortionGallery />}
+        {activeTab === 'history' && <HistoryTracker />}
       </main>
     </div>
   );
