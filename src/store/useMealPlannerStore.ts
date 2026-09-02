@@ -47,6 +47,7 @@ export interface SavedRecipe {
   proteinGrams: number;
   carbGrams: number;
   fatGrams: number;
+  mealWindow?: MealWindow;
 }
 
 const DEFAULT_PROFILE: UserProfile = {
@@ -65,6 +66,8 @@ const DEFAULT_PROFILE: UserProfile = {
   spiceLevel: 'medium',
   customExclusions: [],
 };
+
+const STORAGE_KEY = 'auto-meal-planner:state:v1';
 
 interface MealPlannerState {
   profile: UserProfile;
@@ -98,6 +101,8 @@ interface MealPlannerState {
     macros?: { proteinGrams: number; carbGrams: number; fatGrams: number },
   ) => void;
   removeLoggedFood: (id: string) => void;
+  /** Inline edit of a logged entry (name, calories, macros, meal type, portion label). */
+  updateLoggedFood: (id: string, changes: Partial<Omit<LoggedFoodEntry, 'id' | 'timestamp'>>) => void;
   updateLoggedFoodCooking: (
     id: string,
     cookingMethod: CookingMethod,
@@ -121,14 +126,37 @@ interface MealPlannerState {
   totalConsumedCalories: () => number;
 }
 
+function loadPersistedState(): Partial<Pick<MealPlannerState, 'profile' | 'foodCatalog' | 'exerciseLogs' | 'loggedFoods' | 'hydrationLogs' | 'savedRecipes' | 'calorieAdjustmentPlan'>> {
+  if (typeof window === 'undefined') return {};
+
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    if (!raw) return {};
+    return JSON.parse(raw) as Partial<Pick<MealPlannerState, 'profile' | 'foodCatalog' | 'exerciseLogs' | 'loggedFoods' | 'hydrationLogs' | 'savedRecipes' | 'calorieAdjustmentPlan'>>;
+  } catch {
+    return {};
+  }
+}
+
+function getInitialFoodCatalog(persistedCatalog?: CatalogFoodItem[]) {
+  if (!persistedCatalog || persistedCatalog.length === 0) return FOOD_CATALOG;
+
+  const builtInFoodIds = new Set(FOOD_CATALOG.map((food) => food.id));
+  const customFoods = persistedCatalog.filter((food) => !builtInFoodIds.has(food.id));
+
+  return [...FOOD_CATALOG, ...customFoods];
+}
+
+const persistedState = loadPersistedState();
+
 export const useMealPlannerStore = create<MealPlannerState>((set, get) => ({
-  profile: DEFAULT_PROFILE,
-  foodCatalog: FOOD_CATALOG,
-  exerciseLogs: [],
-  loggedFoods: [],
-  hydrationLogs: [],
-  savedRecipes: [],
-  calorieAdjustmentPlan: null,
+  profile: persistedState.profile ?? DEFAULT_PROFILE,
+  foodCatalog: getInitialFoodCatalog(persistedState.foodCatalog),
+  exerciseLogs: persistedState.exerciseLogs ?? [],
+  loggedFoods: persistedState.loggedFoods ?? [],
+  hydrationLogs: persistedState.hydrationLogs ?? [],
+  savedRecipes: persistedState.savedRecipes ?? [],
+  calorieAdjustmentPlan: persistedState.calorieAdjustmentPlan ?? null,
 
   updateProfile: (partial) => set((state) => ({ profile: { ...state.profile, ...partial } })),
   setGender: (gender) => set((state) => ({ profile: { ...state.profile, gender } })),
@@ -193,6 +221,10 @@ export const useMealPlannerStore = create<MealPlannerState>((set, get) => ({
     })),
   removeLoggedFood: (id) =>
     set((state) => ({ loggedFoods: state.loggedFoods.filter((entry) => entry.id !== id) })),
+  updateLoggedFood: (id, changes) =>
+    set((state) => ({
+      loggedFoods: state.loggedFoods.map((entry) => (entry.id === id ? { ...entry, ...changes } : entry)),
+    })),
   updateLoggedFoodCooking: (id, cookingMethod, oilType, oilAmount, oilUnit) =>
     set((state) => ({
       loggedFoods: state.loggedFoods.map((entry) => {
@@ -257,3 +289,41 @@ export const useMealPlannerStore = create<MealPlannerState>((set, get) => ({
 
   totalConsumedCalories: () => get().loggedFoods.reduce((total, entry) => total + entry.calories, 0),
 }));
+
+if (typeof window !== 'undefined') {
+  useMealPlannerStore.subscribe((state) => {
+    const snapshot = {
+      profile: state.profile,
+      foodCatalog: state.foodCatalog,
+      exerciseLogs: state.exerciseLogs,
+      loggedFoods: state.loggedFoods,
+      hydrationLogs: state.hydrationLogs,
+      savedRecipes: state.savedRecipes,
+      calorieAdjustmentPlan: state.calorieAdjustmentPlan,
+    };
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot));
+  });
+
+  const catalog = useMealPlannerStore.getState().foodCatalog;
+  fetch('/api/kroger-images', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      foods: catalog.map(({ id, barcode, name }) => ({ id, barcode, name })),
+    }),
+  })
+    .then((response) => (response.ok ? response.json() : null))
+    .then((data: { images?: Record<string, string> } | null) => {
+      const images = data?.images;
+      if (!images || Object.keys(images).length === 0) return;
+
+      useMealPlannerStore.setState((state) => ({
+        foodCatalog: state.foodCatalog.map((food) =>
+          images[food.id] ? { ...food, imageUrl: images[food.id] } : food,
+        ),
+      }));
+    })
+    .catch(() => {
+      // Keep existing catalog images when Kroger is unavailable.
+    });
+}
