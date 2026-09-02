@@ -6,8 +6,9 @@ import { compareRawAndCookedCalories, getDietaryWarnings } from '@/lib/fitnessMe
 import type { CookingOption, DietaryWarning, MealWindow } from '@/lib/fitnessMealPlanner';
 import { CATEGORY_FALLBACK_ICON } from '@/lib/foodCatalog';
 import type { CatalogFoodItem } from '@/lib/foodCatalog';
-import { DEFAULT_FOOD_IMAGE } from '@/lib/imageFallback';
+import { getPortionGuideForCategory } from '@/lib/portionGuides';
 import { formatLabel } from '@/lib/format';
+import FoodImage from './FoodImage';
 import Card from './ui/Card';
 
 type PortionMode = 'raw' | 'cooked';
@@ -50,14 +51,14 @@ export default function PortionGallery() {
     <div className="space-y-6">
       <div className="flex items-center justify-between rounded-2xl border border-surface-border bg-surface-card p-4">
         <div>
-          <h3 className="text-base font-semibold text-slate-100">Portion Gallery</h3>
-          <p className="text-sm text-slate-400">Photo view of logged and recommended meals with raw/cooked portions</p>
+          <h3 className="text-base font-semibold text-white">Portion Gallery</h3>
+          <p className="text-sm text-gray-500">Photo view of logged and recommended meals with raw/cooked portions</p>
         </div>
         <div className="flex rounded-xl bg-white/5 p-1">
           <button
             onClick={() => setPortionMode('raw')}
             className={`rounded-lg px-4 py-1.5 text-sm font-medium transition-colors ${
-              portionMode === 'raw' ? 'bg-accent text-white' : 'text-slate-300'
+              portionMode === 'raw' ? 'bg-accent text-black' : 'text-gray-300'
             }`}
           >
             Raw
@@ -65,7 +66,7 @@ export default function PortionGallery() {
           <button
             onClick={() => setPortionMode('cooked')}
             className={`rounded-lg px-4 py-1.5 text-sm font-medium transition-colors ${
-              portionMode === 'cooked' ? 'bg-accent text-white' : 'text-slate-300'
+              portionMode === 'cooked' ? 'bg-accent text-black' : 'text-gray-300'
             }`}
           >
             Cooked
@@ -75,7 +76,7 @@ export default function PortionGallery() {
 
       <Card title="Logged Today" subtitle="Photos of everything you've logged so far">
         {loggedFoods.length === 0 ? (
-          <p className="text-sm text-slate-500">No foods logged yet — log food from the Meal Plan tab.</p>
+          <p className="text-sm text-gray-600">No foods logged yet — log food from the Meal Plan tab.</p>
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {loggedFoods.map((entry) => {
@@ -86,6 +87,7 @@ export default function PortionGallery() {
                 <PortionPhotoCard
                   key={entry.id}
                   name={entry.name}
+                  foodId={food?.id}
                   category={food?.category}
                   imageUrl={food?.imageUrl}
                   portion={food ? (entry.portionMode === 'raw' ? food.portionRaw : food.portionCooked) : entry.portionMode}
@@ -105,7 +107,7 @@ export default function PortionGallery() {
       {(Object.keys(MEAL_LABELS) as MealWindow[]).map((window) => (
         <Card key={window} title={`Recommended — ${MEAL_LABELS[window]}`}>
           {foodsByMeal[window].length === 0 ? (
-            <p className="text-sm text-slate-500">No matching foods for this meal window.</p>
+            <p className="text-sm text-gray-600">No matching foods for this meal window.</p>
           ) : (
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {foodsByMeal[window].map((food) => {
@@ -116,6 +118,7 @@ export default function PortionGallery() {
                   <PortionPhotoCard
                     key={food.id}
                     name={food.name}
+                    foodId={food.id}
                     category={food.category}
                     imageUrl={food.imageUrl}
                     portion={portion}
@@ -138,6 +141,7 @@ export default function PortionGallery() {
 
 function PortionPhotoCard({
   name,
+  foodId,
   category,
   imageUrl,
   portion,
@@ -149,6 +153,7 @@ function PortionPhotoCard({
   warnings = [],
 }: {
   name: string;
+  foodId?: string;
   category?: keyof typeof CATEGORY_FALLBACK_ICON;
   imageUrl?: string;
   portion: string;
@@ -159,22 +164,19 @@ function PortionPhotoCard({
   cookingOption?: CookingOption;
   warnings?: DietaryWarning[];
 }) {
-  const resolvedImageUrl = imageUrl || DEFAULT_FOOD_IMAGE;
+  const portionGuide = category ? getPortionGuideForCategory(category).guide : undefined;
   const hasMacros = proteinGrams !== undefined || carbGrams !== undefined || fatGrams !== undefined;
 
   return (
     <div className="overflow-hidden rounded-xl border border-surface-border bg-white/5">
       <div className="relative w-full overflow-hidden bg-gradient-to-br from-white/10 to-white/0">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={resolvedImageUrl}
+        <FoodImage
+          src={imageUrl}
           alt={name}
-          onError={(e) => {
-            e.currentTarget.src = DEFAULT_FOOD_IMAGE;
-          }}
-          className="object-cover w-full h-48 rounded-t-xl"
+          portionGuide={portionGuide}
+          item={foodId ? { id: foodId, name, ingredientQuery: name } : undefined}
         />
-        <div className="absolute bottom-2 right-2 rounded-lg bg-black/70 px-2 py-1 text-right text-xs font-semibold text-accent-green backdrop-blur">
+        <div className="absolute bottom-2 right-2 rounded-lg bg-black/70 px-2 py-1 text-right text-xs font-semibold text-accent backdrop-blur">
           <div>{Math.round(calories)} kcal</div>
           {hasMacros && (
             <div className="font-normal text-slate-300">

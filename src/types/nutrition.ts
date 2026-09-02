@@ -4,6 +4,8 @@
  * and micronutrient/supplement-specific fields used across the app.
  */
 
+import type { PortionGuideKey } from '@/lib/imageFallback';
+
 // ============================================================
 // 35 MASTER FOOD CATEGORIES + SUPPLEMENTS
 // ============================================================
@@ -147,6 +149,8 @@ export interface NutritionItem extends Micronutrients, SupplementDetails {
   brand?: string;
   category: NutritionCategory;
   isSupplement: boolean;
+  /** Hand-measurement portion guide this item is measured by (drives image fallback). */
+  portionGuide?: PortionGuideKey;
   servingSize: ServingSize;
   calories: number;
   proteinGrams: number;

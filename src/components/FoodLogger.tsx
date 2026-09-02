@@ -7,6 +7,7 @@ import type { NutritionCategory, NutritionItem, ServingUnit } from '@/types/nutr
 import { NUTRITION_DATABASE } from '@/data/nutritionDatabase';
 import { loadMyFoods, saveMyFoods } from '@/lib/myFoodsStorage';
 import { formatLabel } from '@/lib/format';
+import type { MealWindow } from '@/lib/fitnessMealPlanner';
 import Card from './ui/Card';
 import FoodImage from './FoodImage';
 
@@ -21,9 +22,11 @@ function matchesQuery(item: NutritionItem, query: string): boolean {
 
 export default function FoodLogger() {
   const logFood = useMealPlannerStore((s) => s.logFood);
+  const addSavedRecipe = useMealPlannerStore((s) => s.addSavedRecipe);
   const [myFoods, setMyFoods] = useState<NutritionItem[]>([]);
   const [category, setCategory] = useState<NutritionCategory | 'all'>('all');
   const [query, setQuery] = useState('');
+  const [mealType, setMealType] = useState<'breakfast' | 'lunch' | 'dinner' | 'snacks'>('breakfast');
   const [status, setStatus] = useState<string | null>(null);
   const [showBuilder, setShowBuilder] = useState(false);
 
@@ -44,20 +47,39 @@ export default function FoodLogger() {
   const supplements = filteredItems.filter((item) => item.isSupplement);
 
   const handleLog = (item: NutritionItem) => {
-    logFood(item.isCustom ? item.id : `nutrition-${item.id}-${crypto.randomUUID()}`, item.name, item.calories, 'raw', 'raw', undefined, undefined, {
-      proteinGrams: item.proteinGrams,
-      carbGrams: item.carbGrams,
-      fatGrams: item.fatGrams,
-    });
-    setStatus(`Logged ${item.name} (${item.calories} kcal).`);
+    logFood(
+      item.isCustom ? item.id : `nutrition-${item.id}-${crypto.randomUUID()}`,
+      item.name,
+      item.calories,
+      'raw',
+      'raw',
+      undefined,
+      mealType,
+      {
+        proteinGrams: item.proteinGrams,
+        carbGrams: item.carbGrams,
+        fatGrams: item.fatGrams,
+      },
+    );
+    setStatus(`Logged ${item.name} (${item.calories} kcal) for ${formatLabel(mealType)}.`);
   };
 
-  const handleSaveCustomFood = (item: NutritionItem) => {
+  const handleSaveCustomFood = (item: NutritionItem, mealWindow: MealWindow) => {
     const updated = [...myFoods, item];
     setMyFoods(updated);
     saveMyFoods(updated);
+    addSavedRecipe({
+      id: `recipe-${item.id}`,
+      foodId: item.id,
+      name: item.name,
+      calories: item.calories,
+      proteinGrams: item.proteinGrams,
+      carbGrams: item.carbGrams,
+      fatGrams: item.fatGrams,
+      mealWindow,
+    });
     setShowBuilder(false);
-    setStatus(`Saved ${item.name} to My Foods.`);
+    setStatus(`Saved ${item.name} to My Foods and Recipe Box.`);
   };
 
   return (
@@ -79,21 +101,27 @@ export default function FoodLogger() {
               </option>
             ))}
           </select>
+          <select value={mealType} onChange={(e) => setMealType(e.target.value as typeof mealType)} className="input sm:w-40">
+            <option value="breakfast">Breakfast</option>
+            <option value="lunch">Lunch</option>
+            <option value="dinner">Dinner</option>
+            <option value="snacks">Snacks</option>
+          </select>
           <button
             onClick={() => setShowBuilder((prev) => !prev)}
-            className="rounded-lg bg-accent-green/90 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-accent-green"
+            className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-black transition-colors hover:bg-accent/90"
           >
             + Custom Food
           </button>
         </div>
-        {status && <p className="mt-2 text-xs text-slate-400">{status}</p>}
+        {status && <p className="mt-2 text-xs text-gray-500">{status}</p>}
       </Card>
 
       {showBuilder && <CustomFoodBuilder onSave={handleSaveCustomFood} onCancel={() => setShowBuilder(false)} />}
 
       <Card title={`Foods (${foods.length})`}>
         {foods.length === 0 ? (
-          <p className="text-sm text-slate-500">No matching foods found.</p>
+          <p className="text-sm text-gray-600">No matching foods found.</p>
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {foods.map((item) => (
@@ -105,7 +133,7 @@ export default function FoodLogger() {
 
       <Card title={`Supplements (${supplements.length})`} subtitle="Pre-workouts, protein powders, and other supplements">
         {supplements.length === 0 ? (
-          <p className="text-sm text-slate-500">No matching supplements found.</p>
+          <p className="text-sm text-gray-600">No matching supplements found.</p>
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {supplements.map((item) => (
@@ -121,21 +149,26 @@ export default function FoodLogger() {
 function NutritionItemCard({ item, onLog }: { item: NutritionItem; onLog: () => void }) {
   return (
     <div className="overflow-hidden rounded-xl border border-surface-border bg-white/5">
-      <FoodImage src={item.imageUrl} alt={item.name} />
+      <FoodImage
+        src={item.imageUrl}
+        alt={item.name}
+        portionGuide={item.portionGuide}
+        item={{ id: item.id, name: item.name, ingredientQuery: item.name }}
+      />
       <div className="p-4">
-        <h4 className="text-sm font-semibold text-slate-100">
+        <h4 className="text-sm font-semibold text-white">
           {item.name}
-          {item.brand && <span className="ml-1.5 text-xs font-normal text-slate-400">({item.brand})</span>}
+          {item.brand && <span className="ml-1.5 text-xs font-normal text-gray-500">({item.brand})</span>}
         </h4>
-        <p className="mt-1 text-xs text-slate-400">
+        <p className="mt-1 text-xs text-gray-500">
           Serving: {item.servingSize.amount} {item.servingSize.unit}
         </p>
-        <p className="text-lg font-bold text-accent-green">{item.calories} kcal</p>
-        <p className="text-xs text-slate-500">
+        <p className="text-lg font-bold text-accent">{item.calories} kcal</p>
+        <p className="text-xs text-gray-600">
           P {item.proteinGrams}g · C {item.carbGrams}g · F {item.fatGrams}g
         </p>
         {(item.fiberGrams !== undefined || item.sugarGrams !== undefined || item.sodiumMg !== undefined) && (
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-gray-600">
             Fiber {item.fiberGrams ?? 0}g · Sugar {item.sugarGrams ?? 0}g · Sodium {item.sodiumMg ?? 0}mg
           </p>
         )}
@@ -152,7 +185,7 @@ function NutritionItemCard({ item, onLog }: { item: NutritionItem; onLog: () => 
               </span>
             )}
             {item.activeIngredients && item.activeIngredients.length > 0 && (
-              <span className="rounded-full bg-white/10 px-2 py-0.5 text-[11px] font-semibold text-slate-300">
+              <span className="rounded-full bg-white/10 px-2 py-0.5 text-[11px] font-semibold text-gray-300\">
                 {item.activeIngredients.join(', ')}
               </span>
             )}
@@ -160,7 +193,7 @@ function NutritionItemCard({ item, onLog }: { item: NutritionItem; onLog: () => 
         )}
         <div className="mt-2 flex flex-wrap gap-1.5">
           {item.dietaryTags.map((tag) => (
-            <span key={tag} className="rounded-full bg-white/5 px-2 py-0.5 text-[10px] text-slate-400">
+            <span key={tag} className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] text-gray-400">
               {formatLabel(tag)}
             </span>
           ))}
@@ -180,7 +213,7 @@ function CustomFoodBuilder({
   onSave,
   onCancel,
 }: {
-  onSave: (item: NutritionItem) => void;
+  onSave: (item: NutritionItem, mealWindow: MealWindow) => void;
   onCancel: () => void;
 }) {
   const [name, setName] = useState('');
@@ -196,28 +229,32 @@ function CustomFoodBuilder({
   const [sugar, setSugar] = useState('');
   const [sodium, setSodium] = useState('');
   const [imageUrl, setImageUrl] = useState('');
+  const [mealWindow, setMealWindow] = useState<MealWindow>('breakfast');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || !calories) return;
-    onSave({
-      id: `custom-${crypto.randomUUID()}`,
-      name,
-      brand: brand || undefined,
-      category,
-      isSupplement: category === 'supplement',
-      isCustom: true,
-      servingSize: { amount: Number(servingAmount) || 1, unit: servingUnit },
-      calories: Number(calories),
-      proteinGrams: Number(protein) || 0,
-      carbGrams: Number(carbs) || 0,
-      fatGrams: Number(fat) || 0,
-      fiberGrams: fiber ? Number(fiber) : undefined,
-      sugarGrams: sugar ? Number(sugar) : undefined,
-      sodiumMg: sodium ? Number(sodium) : undefined,
-      dietaryTags: [],
-      imageUrl: imageUrl || undefined,
-    });
+    onSave(
+      {
+        id: `custom-${crypto.randomUUID()}`,
+        name,
+        brand: brand || undefined,
+        category,
+        isSupplement: category === 'supplement',
+        isCustom: true,
+        servingSize: { amount: Number(servingAmount) || 1, unit: servingUnit },
+        calories: Number(calories),
+        proteinGrams: Number(protein) || 0,
+        carbGrams: Number(carbs) || 0,
+        fatGrams: Number(fat) || 0,
+        fiberGrams: fiber ? Number(fiber) : undefined,
+        sugarGrams: sugar ? Number(sugar) : undefined,
+        sodiumMg: sodium ? Number(sodium) : undefined,
+        dietaryTags: [],
+        imageUrl: imageUrl || undefined,
+      },
+      mealWindow,
+    );
   };
 
   return (
@@ -225,15 +262,15 @@ function CustomFoodBuilder({
       <form onSubmit={handleSubmit} className="space-y-3">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-slate-300">Name</label>
+            <label className="mb-1.5 block text-sm font-medium text-gray-300">Name</label>
             <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Homemade Protein Muffin" />
           </div>
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-slate-300">Brand (optional)</label>
+            <label className="mb-1.5 block text-sm font-medium text-gray-300">Brand (optional)</label>
             <input className="input" value={brand} onChange={(e) => setBrand(e.target.value)} />
           </div>
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-slate-300">Category</label>
+            <label className="mb-1.5 block text-sm font-medium text-gray-300">Category</label>
             <select className="input" value={category} onChange={(e) => setCategory(e.target.value as NutritionCategory)}>
               {ALL_NUTRITION_CATEGORIES.map((cat) => (
                 <option key={cat} value={cat}>
@@ -242,13 +279,22 @@ function CustomFoodBuilder({
               ))}
             </select>
           </div>
-          <div className="flex gap-2">
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-gray-300">Meal Window</label>
+            <select className="input" value={mealWindow} onChange={(e) => setMealWindow(e.target.value as MealWindow)}>
+              <option value="breakfast">Breakfast</option>
+              <option value="lunch">Lunch</option>
+              <option value="dinner">Dinner</option>
+              <option value="snacks">Snacks</option>
+            </select>
+          </div>
+          <div className="sm:col-span-2 flex gap-2">
             <div className="flex-1">
-              <label className="mb-1.5 block text-sm font-medium text-slate-300">Serving Amount</label>
+              <label className="mb-1.5 block text-sm font-medium text-gray-300">Serving Amount</label>
               <input type="number" className="input" value={servingAmount} onChange={(e) => setServingAmount(e.target.value)} />
             </div>
             <div className="flex-1">
-              <label className="mb-1.5 block text-sm font-medium text-slate-300">Unit</label>
+              <label className="mb-1.5 block text-sm font-medium text-gray-300">Unit</label>
               <select className="input" value={servingUnit} onChange={(e) => setServingUnit(e.target.value as ServingUnit)}>
                 {SERVING_UNITS.map((unit) => (
                   <option key={unit} value={unit}>
@@ -262,54 +308,54 @@ function CustomFoodBuilder({
 
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-slate-300">Calories</label>
+            <label className="mb-1.5 block text-sm font-medium text-gray-300">Calories</label>
             <input type="number" className="input" value={calories} onChange={(e) => setCalories(e.target.value)} />
           </div>
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-slate-300">Protein (g)</label>
+            <label className="mb-1.5 block text-sm font-medium text-gray-300">Protein (g)</label>
             <input type="number" className="input" value={protein} onChange={(e) => setProtein(e.target.value)} />
           </div>
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-slate-300">Carbs (g)</label>
+            <label className="mb-1.5 block text-sm font-medium text-gray-300">Carbs (g)</label>
             <input type="number" className="input" value={carbs} onChange={(e) => setCarbs(e.target.value)} />
           </div>
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-slate-300">Fat (g)</label>
+            <label className="mb-1.5 block text-sm font-medium text-gray-300">Fat (g)</label>
             <input type="number" className="input" value={fat} onChange={(e) => setFat(e.target.value)} />
           </div>
         </div>
 
         <div className="grid grid-cols-3 gap-3">
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-slate-300">Fiber (g)</label>
+            <label className="mb-1.5 block text-sm font-medium text-gray-300">Fiber (g)</label>
             <input type="number" className="input" value={fiber} onChange={(e) => setFiber(e.target.value)} />
           </div>
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-slate-300">Sugar (g)</label>
+            <label className="mb-1.5 block text-sm font-medium text-gray-300">Sugar (g)</label>
             <input type="number" className="input" value={sugar} onChange={(e) => setSugar(e.target.value)} />
           </div>
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-slate-300">Sodium (mg)</label>
+            <label className="mb-1.5 block text-sm font-medium text-gray-300">Sodium (mg)</label>
             <input type="number" className="input" value={sodium} onChange={(e) => setSodium(e.target.value)} />
           </div>
         </div>
 
         <div>
-          <label className="mb-1.5 block text-sm font-medium text-slate-300">Image URL (optional)</label>
+          <label className="mb-1.5 block text-sm font-medium text-gray-300">Image URL (optional)</label>
           <input className="input" value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="https://..." />
         </div>
 
         <div className="flex gap-2 pt-2">
           <button
             type="submit"
-            className="flex-1 rounded-lg bg-accent-green/90 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-accent-green"
+            className="flex-1 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-black transition-colors hover:bg-accent/90"
           >
             Save to My Foods
           </button>
           <button
             type="button"
             onClick={onCancel}
-            className="rounded-lg bg-white/5 px-4 py-2 text-sm font-semibold text-slate-300 transition-colors hover:bg-white/10"
+            className="rounded-lg bg-white/10 px-4 py-2 text-sm font-semibold text-gray-300 transition-colors hover:bg-accent/40"
           >
             Cancel
           </button>

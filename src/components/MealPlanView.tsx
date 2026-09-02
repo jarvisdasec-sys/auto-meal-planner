@@ -22,7 +22,8 @@ import {
   TIME_BUDGET_LABELS,
 } from '@/lib/pantryPlanner';
 import type { TimeBudget } from '@/lib/pantryPlanner';
-import { DEFAULT_FOOD_IMAGE } from '@/lib/imageFallback';
+import { getPortionGuideForCategory } from '@/lib/portionGuides';
+import FoodImage from './FoodImage';
 import Card from './ui/Card';
 import ScanBarcodeButton from './ScanBarcodeButton';
 import CookingMethodControls from './CookingMethodControls';
@@ -219,6 +220,7 @@ function FoodItemCard({
 }) {
   const comparison = compareRawAndCookedCalories(food);
   const portion = portionMode === 'raw' ? comparison.portionRaw : comparison.portionCooked;
+  const portionGuide = getPortionGuideForCategory(food.category);
   const [showSwap, setShowSwap] = useState(false);
 
   const [method, setMethod] = useState<CookingMethod>(food.cookingOptions[0]?.method ?? 'raw');
@@ -237,14 +239,11 @@ function FoodItemCard({
 
   return (
     <div className="flex flex-col justify-between overflow-hidden rounded-xl border border-surface-border bg-white/5">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={food.imageUrl || DEFAULT_FOOD_IMAGE}
+      <FoodImage
+        src={food.imageUrl}
         alt={food.name}
-        onError={(e) => {
-          e.currentTarget.src = DEFAULT_FOOD_IMAGE;
-        }}
-        className="object-cover w-full h-48 rounded-t-xl"
+        portionGuide={portionGuide.guide}
+        item={{ id: food.id, name: food.name, ingredientQuery: food.name }}
       />
       <div className="space-y-2 p-4">
         <h4 className="text-sm font-semibold text-slate-100">{food.name}</h4>
