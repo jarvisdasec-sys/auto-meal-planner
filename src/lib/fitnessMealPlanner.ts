@@ -1,3 +1,6 @@
+import { addDays, isDateKey, localDateKey, type DateKey } from './dateKeys';
+import { assertFiniteNumber, validateServings } from './mealPlannerValidation';
+
 /**
  * Fitness & Meal Planner Engine
  * Modular TypeScript engine for metabolic calculations, meal planning,
@@ -110,15 +113,26 @@ export interface FoodItem {
   proteinGrams: number;
   carbGrams: number;
   fatGrams: number;
+  /**
+   * Calorie basis represented by the one legacy P/C/F seed set. Missing catalog
+   * values default to cooked-basis; raw/cooked conversions are estimates.
+   */
+  macroBasis?: MacroBasis;
   snackProfile: SnackCraving[];
   /** Estimated price (per portion/unit) at each supported store */
   estimatedPrices: EstimatedPrices;
+  /** Explicit store prices entered by a user; these take precedence over static estimates. */
+  knownPrices?: Partial<EstimatedPrices>;
+  /** False explicitly marks a store price as unavailable rather than free. */
+  priceAvailability?: Partial<Record<StoreName, boolean>>;
   /** High-quality food photo; UI falls back to a default category image when absent */
   imageUrl?: string;
   /** Available cooking methods with their macro/time impact */
   cookingOptions: CookingOption[];
   /** Allergen, FODMAP, GERD-trigger, and spice metadata used by the dietary safeguards engine */
   dietaryTags: DietaryTags;
+  /** Optional ingredient names when the item represents a mixed food or recipe. */
+  ingredients?: string[];
 }
 
 export interface DietaryTags {
@@ -129,6 +143,8 @@ export interface DietaryTags {
   containsLactose: boolean;
   spiceLevel: SpiceLevel;
 }
+
+export type MacroBasis = 'raw' | 'cooked';
 
 // ============================================================
 // COOKING METHOD & PREP ENGINE (oil/butter additions, macro adjustments)
@@ -165,6 +181,7 @@ export function calculateAddedOilCalories(
   amount: number,
   unit: 'tbsp' | 'tsp',
 ): { addedCalories: number; addedFatGrams: number } {
+  assertFiniteNumber(amount, 'Oil amount', { min: 0, max: 32, allowZero: true });
   const tablespoons = unit === 'tsp' ? amount / TSP_PER_TBSP : amount;
   const perTbsp = OIL_NUTRITION_PER_TBSP[oilType];
   return {
@@ -190,6 +207,80 @@ export function applyCookingOption(
     proteinGrams: Math.round(base.proteinGrams * option.macroMultiplier.protein * 10) / 10,
     carbGrams: Math.round(base.carbGrams * option.macroMultiplier.carbs * 10) / 10,
     fatGrams: Math.round((base.fatGrams * option.macroMultiplier.fat + (option.addedFatGrams ?? 0)) * 10) / 10,
+  };
+}
+
+export type PortionMode = 'raw' | 'cooked';
+
+export interface CalculatedFoodNutrition extends AdjustedMacros {
+  portionMode: PortionMode;
+  cookingMethod: CookingMethod;
+  servings: number;
+  oilAddition?: OilAddition;
+  /** Source basis of the catalog's single P/C/F seed set. */
+  macroBasis: MacroBasis;
+  /** Approximate raw/cooked conversion applied to seed P/C/F values. */
+  macroScale: number;
+}
+
+function roundOne(value: number): number {
+  return Math.round(value * 10) / 10;
+}
+
+/**
+ * Calculate one final nutrition snapshot for a catalog food. A catalog has one
+ * P/C/F seed set, not separate laboratory measurements for raw and cooked
+ * portions. `macroBasis` identifies that seed (legacy defaults to cooked), and
+ * the selected calorie-basis ratio scales it predictably. This is an estimate;
+ * calorie labels remain approximate seed data and this function deliberately
+ * does not force macro-calorie arithmetic to equal those labels. Pan and
+ * deep-fry presets do not add assumed oil: only entered oil is added once.
+ */
+export function calculateFoodNutrition(
+  food: FoodItem,
+  portionMode: PortionMode,
+  cookingMethod: CookingMethod,
+  oilAddition?: Pick<OilAddition, 'oilType' | 'amount' | 'unit'>,
+  servings = 1,
+): CalculatedFoodNutrition {
+  const validServings = validateServings(servings);
+  const baseCalories = portionMode === 'cooked' ? food.caloriesCooked : food.caloriesRaw;
+  assertFiniteNumber(baseCalories, 'Food calories', { min: 0, max: 10000, allowZero: true });
+  const macroBasis: MacroBasis = food.macroBasis ?? 'cooked';
+  const macroBasisCalories = macroBasis === 'raw' ? food.caloriesRaw : food.caloriesCooked;
+  const macroBasisRatio = macroBasisCalories > 0 ? baseCalories / macroBasisCalories : 1;
+  const base = {
+    calories: baseCalories,
+    proteinGrams: food.proteinGrams * macroBasisRatio,
+    carbGrams: food.carbGrams * macroBasisRatio,
+    fatGrams: food.fatGrams * macroBasisRatio,
+  };
+  const option = food.cookingOptions.find((candidate) => candidate.method === cookingMethod)
+    ?? food.cookingOptions.find((candidate) => candidate.method === 'raw')
+    ?? { method: cookingMethod, prepTimeMinutes: 0, cookTimeMinutes: 0, macroMultiplier: { calories: 1, protein: 1, carbs: 1, fat: 1 } };
+  const multiplier = requiresOilInput(cookingMethod)
+    ? { calories: 1, protein: 1, carbs: 1, fat: 1 }
+    : option.macroMultiplier;
+  const cooked = {
+    calories: base.calories * multiplier.calories,
+    proteinGrams: base.proteinGrams * multiplier.protein,
+    carbGrams: base.carbGrams * multiplier.carbs,
+    fatGrams: base.fatGrams * multiplier.fat,
+  };
+  const finalOil = oilAddition
+    ? { ...oilAddition, ...calculateAddedOilCalories(oilAddition.oilType, oilAddition.amount, oilAddition.unit) }
+    : undefined;
+  return {
+    calories: Math.round((cooked.calories + (finalOil?.addedCalories ?? 0)) * validServings),
+    proteinGrams: roundOne(cooked.proteinGrams * validServings),
+    carbGrams: roundOne(cooked.carbGrams * validServings),
+    fatGrams: roundOne((cooked.fatGrams + (finalOil?.addedFatGrams ?? 0)) * validServings),
+    portionMode,
+    cookingMethod,
+    servings: validServings,
+    oilAddition: finalOil,
+    macroBasis,
+    macroScale: macroBasisRatio,
   };
 }
 
@@ -229,6 +320,8 @@ export interface ExerciseLog {
   durationMinutes: number;
   caloriesBurned: number;
   timestamp: string; // ISO 8601 timestamp
+  /** Local calendar date captured at log time; legacy logs fall back to timestamp. */
+  dateKey?: DateKey;
 }
 
 export interface DailyEnergyTracker {
@@ -475,17 +568,91 @@ type DietaryProfile = Pick<UserProfile, 'majorAllergens' | 'giConditions' | 'spi
 
 const SPICE_LEVEL_RANK: Record<SpiceLevel, number> = { none: 0, mild: 1, medium: 2, spicy: 3 };
 
+/** Structural descriptor accepted for catalog foods, nutrition items, manual entries, and recipes. */
+export interface DietaryDescriptor {
+  name: string;
+  ingredients?: string[];
+  allergens?: Allergen[];
+  /** Backward-compatible singular/label-style allergen metadata. */
+  allergen?: Allergen | Allergen[];
+  dietaryTags?: DietaryTags | string[];
+  dietaryFlags?: Partial<DietaryTags>;
+  flags?: Partial<DietaryTags>;
+}
+
+export interface DietaryEvaluation {
+  hardBlocked: boolean;
+  hardBlockReasons: string[];
+  warnings: DietaryWarning[];
+  /** Unknown custom/manual ingredients are never presented as certified safe. */
+  verification: 'verified' | 'unverified';
+}
+
+function dietaryFacts(descriptor: DietaryDescriptor): Partial<DietaryTags> | undefined {
+  if (descriptor.dietaryTags && !Array.isArray(descriptor.dietaryTags)) return descriptor.dietaryTags;
+  return descriptor.dietaryFlags ?? descriptor.flags;
+}
+
+function descriptorText(descriptor: DietaryDescriptor): string {
+  return [descriptor.name, ...(descriptor.ingredients ?? [])].join(' ').toLowerCase();
+}
+
+/**
+ * Evaluate known facts before a recommendation, swap, plan, grocery request, or
+ * log mutation. Allergens and explicit custom exclusions are hard blocks; GI and
+ * spice conditions stay warnings. Missing facts are explicitly unverified.
+ */
+export function evaluateDietarySafety(descriptor: DietaryDescriptor, profile: DietaryProfile): DietaryEvaluation {
+  const facts = dietaryFacts(descriptor);
+  const aliasAllergens = descriptor.allergen === undefined
+    ? []
+    : Array.isArray(descriptor.allergen) ? descriptor.allergen : [descriptor.allergen];
+  const knownAllergens = facts?.allergens ?? descriptor.allergens ?? aliasAllergens;
+  const haystack = descriptorText(descriptor);
+  const hardBlockReasons: string[] = [];
+  const warnings: DietaryWarning[] = [];
+  const matchedAllergens = profile.majorAllergens.filter((allergen) => knownAllergens.includes(allergen));
+  if (matchedAllergens.length) {
+    hardBlockReasons.push(`Contains allergen: ${matchedAllergens.join(', ')}`);
+    warnings.push({ label: `Contains ${matchedAllergens.join(', ')} - Allergen`, severity: 'red' });
+  }
+  for (const exclusion of profile.customExclusions) {
+    const normalized = exclusion.trim().toLowerCase();
+    if (normalized && haystack.includes(normalized)) {
+      hardBlockReasons.push(`Contains excluded ingredient: ${exclusion.trim()}`);
+      warnings.push({ label: `Contains excluded ingredient: ${exclusion.trim()}`, severity: 'red' });
+    }
+  }
+  if (profile.giConditions.includes('lactose_intolerance') && facts?.containsLactose) {
+    warnings.push({ label: 'Contains Dairy - Lactose Trigger', severity: 'amber' });
+  }
+  if (profile.giConditions.includes('gluten_sensitivity') && facts?.containsGluten) {
+    warnings.push({ label: 'Contains Gluten - Sensitivity Trigger', severity: 'amber' });
+  }
+  if (profile.giConditions.includes('low_fodmap_ibs') && facts?.isHighFodmap) {
+    warnings.push({ label: 'High FODMAP - IBS Trigger', severity: 'amber' });
+  }
+  if ((profile.giConditions.includes('acid_reflux_gerd') || profile.giConditions.includes('sensitive_stomach')) && facts?.isGerdTrigger) {
+    warnings.push({ label: 'GERD/Sensitive Stomach Trigger', severity: 'amber' });
+  }
+  if (facts?.spiceLevel && SPICE_LEVEL_RANK[facts.spiceLevel] > SPICE_LEVEL_RANK[profile.spiceLevel]) {
+    warnings.push({ label: `High Spice (${facts.spiceLevel}) - Exceeds Your Preference`, severity: 'amber' });
+  }
+  const uniqueWarnings = warnings.filter((warning, index, source) => source.findIndex((item) => item.label === warning.label) === index);
+  return {
+    hardBlocked: hardBlockReasons.length > 0,
+    hardBlockReasons: [...new Set(hardBlockReasons)],
+    warnings: uniqueWarnings,
+    verification: facts || descriptor.allergens || descriptor.allergen || descriptor.ingredients ? 'verified' : 'unverified',
+  };
+}
+
 /**
  * True when a food must be hard-blocked from recommendations: it contains a major allergen
  * or matches one of the user's custom blacklisted ingredients.
  */
 export function isFoodBlockedForProfile(food: FoodItem, profile: DietaryProfile): boolean {
-  if (profile.majorAllergens.some((allergen) => food.dietaryTags.allergens.includes(allergen))) return true;
-  const lowerName = food.name.toLowerCase();
-  if (profile.customExclusions.some((term) => term.trim() && lowerName.includes(term.trim().toLowerCase()))) {
-    return true;
-  }
-  return false;
+  return evaluateDietarySafety(food, profile).hardBlocked;
 }
 
 /** Filter blacklisted foods (allergens + custom exclusions) out of a list of recommendations. */
@@ -504,42 +671,7 @@ export interface DietaryWarning {
  * so already-logged or scanned items still surface a warning even if not pre-filtered.
  */
 export function getDietaryWarnings(food: FoodItem, profile: DietaryProfile): DietaryWarning[] {
-  const warnings: DietaryWarning[] = [];
-  const tags = food.dietaryTags;
-
-  const matchedAllergens = profile.majorAllergens.filter((allergen) => tags.allergens.includes(allergen));
-  if (matchedAllergens.length > 0) {
-    warnings.push({
-      label: `⚠️ Contains ${matchedAllergens.join(', ')} - Allergen`,
-      severity: 'red',
-    });
-  }
-
-  const lowerName = food.name.toLowerCase();
-  const matchedExclusion = profile.customExclusions.find(
-    (term) => term.trim() && lowerName.includes(term.trim().toLowerCase()),
-  );
-  if (matchedExclusion) {
-    warnings.push({ label: `⚠️ Contains excluded ingredient: ${matchedExclusion}`, severity: 'red' });
-  }
-
-  if (profile.giConditions.includes('lactose_intolerance') && tags.containsLactose) {
-    warnings.push({ label: '⚠️ Contains Dairy - Lactose Trigger', severity: 'amber' });
-  }
-  if (profile.giConditions.includes('gluten_sensitivity') && tags.containsGluten) {
-    warnings.push({ label: '⚠️ Contains Gluten - Sensitivity Trigger', severity: 'amber' });
-  }
-  if (profile.giConditions.includes('low_fodmap_ibs') && tags.isHighFodmap) {
-    warnings.push({ label: '⚠️ High FODMAP - IBS Trigger', severity: 'amber' });
-  }
-  if ((profile.giConditions.includes('acid_reflux_gerd') || profile.giConditions.includes('sensitive_stomach')) && tags.isGerdTrigger) {
-    warnings.push({ label: '🌶️ GERD/Sensitive Stomach Trigger', severity: 'amber' });
-  }
-  if (SPICE_LEVEL_RANK[tags.spiceLevel] > SPICE_LEVEL_RANK[profile.spiceLevel]) {
-    warnings.push({ label: `🌶️ High Spice (${tags.spiceLevel}) - Exceeds Your Preference`, severity: 'amber' });
-  }
-
-  return warnings;
+  return evaluateDietarySafety(food, profile).warnings;
 }
 
 // ============================================================
@@ -553,17 +685,49 @@ export interface SmoothAdjustmentPlan {
   daysToSpread: number;
   /** Calories to trim from the daily target on each of those days */
   dailyOffset: number;
+  /** First effective local day; plans always begin after the triggering day. */
+  startDateKey?: DateKey;
+  /** Last effective local day, inclusive. */
+  endDateKey?: DateKey;
+  /** Audit timestamp for a newly created schedule. */
+  createdAt?: string;
 }
 
 /**
  * Instead of slashing tomorrow's calories by the full overage, spread an eating-out
  * overshoot evenly across the next few days for a gentler adjustment.
  */
-export function calculateSmoothAdjustment(excessCalories: number, daysToSpread = 3): SmoothAdjustmentPlan {
-  const clampedDays = Math.max(1, Math.round(daysToSpread));
+export function calculateSmoothAdjustment(excessCalories: number, daysToSpread = 3, today: DateKey = localDateKey()): SmoothAdjustmentPlan {
+  assertFiniteNumber(excessCalories, 'Restaurant excess calories', { min: 0, max: 10000, allowZero: true });
+  assertFiniteNumber(daysToSpread, 'Days to spread', { min: 1, max: 14 });
+  if (!Number.isInteger(daysToSpread)) throw new Error('Days to spread must be a whole number.');
+  if (!isDateKey(today)) throw new Error('Adjustment start date must be a valid local date key.');
+  const clampedDays = daysToSpread;
+  const startDateKey = addDays(today, 1);
   return {
     excessCalories: Math.round(excessCalories),
     daysToSpread: clampedDays,
     dailyOffset: Math.round(excessCalories / clampedDays),
+    startDateKey,
+    endDateKey: addDays(startDateKey, clampedDays - 1),
+    createdAt: new Date().toISOString(),
   };
+}
+
+/**
+ * Returns the scheduled reduction for one local date. Undated legacy schedules
+ * are read safely but inactive, preventing an old offset from lowering targets
+ * indefinitely. Supplying a base target clamps the reduction so targets cannot
+ * become negative.
+ */
+export function getAdjustmentForDate(
+  plan: SmoothAdjustmentPlan | null | undefined,
+  dateKey: DateKey,
+  baseTargetCalories?: number,
+): number {
+  if (!plan || !isDateKey(dateKey) || !isDateKey(plan.startDateKey) || !isDateKey(plan.endDateKey)) return 0;
+  if (dateKey < plan.startDateKey || dateKey > plan.endDateKey) return 0;
+  const offset = Number.isFinite(plan.dailyOffset) && plan.dailyOffset > 0 ? plan.dailyOffset : 0;
+  if (baseTargetCalories === undefined || !Number.isFinite(baseTargetCalories)) return offset;
+  return Math.min(offset, Math.max(0, baseTargetCalories));
 }

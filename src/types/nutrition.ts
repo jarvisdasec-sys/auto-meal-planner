@@ -5,6 +5,7 @@
  */
 
 import type { PortionGuideKey } from '@/lib/imageFallback';
+import type { Allergen, DietaryTags } from '@/lib/fitnessMealPlanner';
 
 // ============================================================
 // 35 MASTER FOOD CATEGORIES + SUPPLEMENTS
@@ -158,6 +159,16 @@ export interface NutritionItem extends Micronutrients, SupplementDetails {
   fatGrams: number;
   /** Freeform dietary tags for search/filtering, e.g. "keto", "high_protein", "vegan" */
   dietaryTags: string[];
+  /** Optional ingredient names supplied by a label or recipe; absent means dietary facts are unverified. */
+  ingredients?: string[];
+  /** Known major allergens. This is optional to keep existing database records valid. */
+  allergens?: Allergen[];
+  /** Optional singular/label-style allergen alias accepted by the dietary evaluator. */
+  allergen?: Allergen | Allergen[];
+  /** Optional structured dietary facts for the shared dietary evaluator. */
+  dietaryFlags?: Partial<DietaryTags>;
+  /** Backward-compatible generic alias for `dietaryFlags`. */
+  flags?: Partial<DietaryTags>;
   imageUrl?: string;
   /** True for items the user created and saved via the Custom Food & Recipe Builder */
   isCustom?: boolean;

@@ -1,0 +1,62 @@
+[
+  {
+    "file": "/images/foods/almonds.webp",
+    "ok": true,
+    "ingredient": "Almonds",
+    "source": "TheMealDB",
+    "source_url": "https://www.themealdb.com/images/ingredients/almonds.png",
+    "attribution_url": "https://www.themealdb.com/",
+    "usage": "Illustrative ingredient artwork; not a measured serving or brand match",
+    "sha256": "eb9273ec4724c45bf0ae4b436f5c711cfa8a91336705da0d3c1aea2978ad0ee2"
+  },
+  {
+    "file": "/images/foods/avocado.webp",
+    "ok": true,
+    "ingredient": "Avocado",
+    "source": "TheMealDB",
+    "source_url": "https://www.themealdb.com/images/ingredients/avocado.png",
+    "attribution_url": "https://www.themealdb.com/",
+    "usage": "Illustrative ingredient artwork; not a measured serving or brand match",
+    "sha256": "0dcef7df425df72f40912e7cd437d2ef2f434f7371d64649fdfbabadf29df0c8"
+  },
+  {
+    "file": "/images/foods/chicken-thigh.webp",
+    "ok": true,
+    "ingredient": "Chicken Thighs",
+    "source": "TheMealDB",
+    "source_url": "https://www.themealdb.com/images/ingredients/chicken_thighs.png",
+    "attribution_url": "https://www.themealdb.com/",
+    "usage": "Illustrative ingredient artwork; not a measured serving or brand match",
+    "sha256": "9b721ed90fd75506a3133f0a511006d4b89d47aa3fa0f10845931ab811dfeebd"
+  },
+  {
+    "file": "/images/foods/banana.webp",
+    "ok": true,
+    "ingredient": "Banana",
+    "source": "TheMealDB",
+    "source_url": "https://www.themealdb.com/images/ingredients/banana.png",
+    "attribution_url": "https://www.themealdb.com/",
+    "usage": "Illustrative ingredient artwork; not a measured serving or brand match",
+    "sha256": "65453ac2f1f0a03cce93b9240263235f8569b6959c843fc01a45c64651d2bebc"
+  },
+  {
+    "file": "/images/foods/blueberries.webp",
+    "ok": true,
+    "ingredient": "Blueberries",
+    "source": "TheMealDB",
+    "source_url": "https://www.themealdb.com/images/ingredients/blueberries.png",
+    "attribution_url": "https://www.themealdb.com/",
+    "usage": "Illustrative ingredient artwork; not a measured serving or brand match",
+    "sha256": "2b10430d4b644aee519600919a4b1af6719c2dfa62ff19fd98e3be894cfecdde"
+  },
+  {
+    "file": "/images/foods/olive-oil.webp",
+    "ok": true,
+    "ingredient": "Extra Virgin Olive Oil",
+    "source": "TheMealDB",
+    "source_url": "https://www.themealdb.com/images/ingredients/extra_virgin_olive_oil.png",
+    "attribution_url": "https://www.themealdb.com/",
+    "usage": "Illustrative ingredient artwork; not a measured serving or brand match",
+    "sha256": "fa928560bd9d018f8669c689b1205b938fe3918dd19b0a2fc3a39c9f0722e373"
+  }
+]

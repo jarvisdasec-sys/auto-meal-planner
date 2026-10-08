@@ -1,6 +1,6 @@
 /**
  * Hosts we are willing to render through `next/image`.
- * Must stay in sync with `images.remotePatterns` in next.config.js.
+ * Keep this list exactly synchronized with `images.remotePatterns` in next.config.js.
  */
 export const ALLOWED_IMAGE_HOSTS = new Set([
   'i5.walmartimages.com',
@@ -14,24 +14,48 @@ export const ALLOWED_IMAGE_HOSTS = new Set([
   'images.unsplash.com',
 ]);
 
-/**
- * Return the URL only if it is https on an allow-listed host, else undefined.
- * Guards against SSRF on the server and against `next/image` 400s on the client
- * when a user-supplied custom food carries an arbitrary URL.
- */
-export function sanitizeRemoteUrl(url: unknown): string | undefined {
-  if (typeof url !== 'string' || url.length === 0) return undefined;
+const SINGLE_SLASH_LOCAL_PATH = /^\/(?!\/)/;
 
-  // Local assets under /public are always safe.
-  if (url.startsWith('/')) return url;
+/**
+ * Return a render-safe URL or `undefined`.
+ *
+ * Local URLs must begin with one slash (for example `/images/food/chicken.jpg`).
+ * Protocol-relative URLs, backslashes, credentials, non-HTTPS URLs, non-default
+ * ports, and hosts outside the Next Image allow-list are all rejected. The same
+ * function is used at the API boundary and in the client component so an invalid
+ * saved custom URL cannot suppress a legitimate lookup.
+ */
+export function sanitizeRemoteUrl(value: unknown): string | undefined {
+  if (typeof value !== 'string' || value.length === 0 || value !== value.trim()) return undefined;
+  if (/[^\u0020-\u007e]/.test(value) || value.includes('\\')) return undefined;
+
+  if (SINGLE_SLASH_LOCAL_PATH.test(value)) {
+    // Percent-encoded backslashes are interpreted as path separators by some URL
+    // consumers, so reject them as well rather than normalizing an ambiguous path.
+    try {
+      if (decodeURIComponent(value).includes('\\')) return undefined;
+    } catch {
+      return undefined;
+    }
+    return value;
+  }
 
   let parsed: URL;
   try {
-    parsed = new URL(url);
+    parsed = new URL(value);
   } catch {
     return undefined;
   }
-  if (parsed.protocol !== 'https:') return undefined;
-  if (!ALLOWED_IMAGE_HOSTS.has(parsed.hostname)) return undefined;
+
+  if (
+    parsed.protocol !== 'https:' ||
+    parsed.username ||
+    parsed.password ||
+    parsed.port ||
+    !ALLOWED_IMAGE_HOSTS.has(parsed.hostname.toLowerCase())
+  ) {
+    return undefined;
+  }
+
   return parsed.toString();
 }

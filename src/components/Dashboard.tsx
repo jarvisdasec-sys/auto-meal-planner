@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { hydrateMealPlannerStore } from '@/store/useMealPlannerStore';
 import ProfileSetupForm from './ProfileSetupForm';
 import MealPlanView from './MealPlanView';
 import EnergyTracker from './EnergyTracker';
@@ -26,6 +27,10 @@ type TabId = (typeof TABS)[number]['id'];
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState<TabId>('profile');
 
+  useEffect(() => {
+    hydrateMealPlannerStore();
+  }, []);
+
   return (
     <div className="mx-auto min-h-screen max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
       <header className="mb-8">
@@ -41,6 +46,8 @@ export default function Dashboard() {
         {TABS.map((tab) => (
           <button
             key={tab.id}
+            type="button"
+            aria-pressed={activeTab === tab.id}
             onClick={() => setActiveTab(tab.id)}
             className={`flex-1 min-w-[140px] rounded-xl px-4 py-2.5 text-sm font-medium transition-colors ${
               activeTab === tab.id
@@ -63,6 +70,11 @@ export default function Dashboard() {
         {activeTab === 'recipes' && <RecipeBox />}
         {activeTab === 'foodLogger' && <FoodLogger />}
       </main>
+      <footer className="mt-8 space-y-2 border-t border-surface-border pt-4 text-xs leading-relaxed text-slate-400">
+        <p>Nutrition, hand portions and grocery prices are estimates. Check current package or restaurant labels for serving sizes and allergens; dietary flags are not an allergy-safety guarantee.</p>
+        <p>Food images are illustrative and some are generated. Product flavor, packaging, preparation and portion size may vary. Ingredient artwork: <a className="underline hover:text-slate-200" href="https://www.themealdb.com/" target="_blank" rel="noreferrer">TheMealDB</a>. Product photos: their respective brands. <a className="underline hover:text-slate-200" href="/images/foods/product-sources.json" target="_blank" rel="noreferrer">Product image sources</a>.</p>
+        <p>Your profile, plans and logs are saved in this browser when storage is available; this app does not provide cloud account sync.</p>
+      </footer>
     </div>
   );
 }

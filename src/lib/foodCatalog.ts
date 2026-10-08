@@ -1,6 +1,5 @@
 import type { CookingOption, DietaryTags, FoodItem, MealWindow } from './fitnessMealPlanner';
 import { buildStorePrices } from './stores';
-import { DEFAULT_FOOD_IMAGE } from './imageFallback';
 
 export type FoodCategory = 'protein' | 'carb' | 'fat' | 'vegetable' | 'snack';
 
@@ -94,10 +93,11 @@ export const FOOD_CATALOG: CatalogFoodItem[] = [
   // ---- Protein ----
   {
     id: 'egg-whites',
-    barcode: '0001112223334',
+    barcode: '', // Generic food: no verified product UPC.
     name: 'Egg Whites (Scrambled)',
+    ingredients: ['egg white'],
     category: 'protein',
-    imageUrl: 'https://images.unsplash.com/photo-1525351484163-7529414344d8?auto=format&fit=crop&w=600&q=80',
+    imageUrl: '/images/foods/egg-whites.webp',
     cookingOptions: [cookSteamed(2, 5), cookPanFried(2, 4, 3)],
     dietaryTags: tags({ allergens: ['eggs'] }),
     portionRaw: '150g (raw liquid)',
@@ -113,10 +113,11 @@ export const FOOD_CATALOG: CatalogFoodItem[] = [
   },
   {
     id: 'grilled-chicken',
-    barcode: '0003334445556',
+    barcode: '', // Generic food: no verified product UPC.
     name: 'Grilled Chicken Breast',
+    ingredients: ['chicken breast'],
     category: 'protein',
-    imageUrl: 'https://images.unsplash.com/photo-1532550907401-a500c9a57435?auto=format&fit=crop&w=600&q=80',
+    imageUrl: '/images/foods/chicken-breast.webp',
     cookingOptions: [cookGrilled(5, 12, 450), cookBaked(5, 25, 400), cookAirFried(5, 18, 380)],
     dietaryTags: tags(),
     portionRaw: '170g (raw)',
@@ -132,10 +133,11 @@ export const FOOD_CATALOG: CatalogFoodItem[] = [
   },
   {
     id: 'salmon',
-    barcode: '0005556667778',
+    barcode: '', // Generic food: no verified product UPC.
     name: 'Baked Salmon Fillet',
+    ingredients: ['salmon'],
     category: 'protein',
-    imageUrl: 'https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?auto=format&fit=crop&w=600&q=80',
+    imageUrl: '/images/foods/salmon.webp',
     cookingOptions: [cookBaked(5, 18, 400), cookGrilled(5, 10, 450), cookPanFried(5, 8, 5)],
     dietaryTags: tags({ allergens: ['fish'] }),
     portionRaw: '160g (raw)',
@@ -151,10 +153,11 @@ export const FOOD_CATALOG: CatalogFoodItem[] = [
   },
   {
     id: 'turkey-breast',
-    barcode: '0001122334455',
+    barcode: '', // Generic food: no verified product UPC.
     name: 'Roasted Turkey Breast',
+    ingredients: ['turkey breast'],
     category: 'protein',
-    imageUrl: DEFAULT_FOOD_IMAGE,
+    imageUrl: '/images/foods/turkey-breast.webp',
     cookingOptions: [cookBaked(5, 30, 375), cookGrilled(5, 14, 450)],
     dietaryTags: tags(),
     portionRaw: '170g (raw)',
@@ -170,10 +173,11 @@ export const FOOD_CATALOG: CatalogFoodItem[] = [
   },
   {
     id: 'tofu',
-    barcode: '0002233445566',
+    barcode: '', // Generic food: no verified product UPC.
     name: 'Firm Tofu Cubes',
+    ingredients: ['soybeans'],
     category: 'protein',
-    imageUrl: DEFAULT_FOOD_IMAGE,
+    imageUrl: '/images/foods/tofu.webp',
     cookingOptions: [cookPanFried(5, 8, 6), cookAirFried(5, 15, 380), cookSteamed(3, 8)],
     dietaryTags: tags({ allergens: ['soy'] }),
     portionRaw: '150g (raw)',
@@ -190,10 +194,11 @@ export const FOOD_CATALOG: CatalogFoodItem[] = [
   // ---- Carb ----
   {
     id: 'oatmeal',
-    barcode: '0002223334445',
+    barcode: '', // Generic food: no verified product UPC.
     name: 'Oatmeal with Berries',
+    ingredients: ['oats', 'blueberries', 'water'],
     category: 'carb',
-    imageUrl: 'https://images.unsplash.com/photo-1517673400267-0251440c45dc?auto=format&fit=crop&w=600&q=80',
+    imageUrl: '/images/foods/oatmeal.webp',
     cookingOptions: [cookBoiled(1, 5)],
     dietaryTags: tags(),
     portionRaw: '50g (dry oats)',
@@ -209,10 +214,11 @@ export const FOOD_CATALOG: CatalogFoodItem[] = [
   },
   {
     id: 'brown-rice',
-    barcode: '0004445556667',
+    barcode: '', // Generic food: no verified product UPC.
     name: 'Brown Rice',
+    ingredients: ['brown rice'],
     category: 'carb',
-    imageUrl: DEFAULT_FOOD_IMAGE,
+    imageUrl: '/images/foods/brown-rice.webp',
     cookingOptions: [cookBoiled(2, 35)],
     dietaryTags: tags(),
     portionRaw: '90g (raw)',
@@ -228,10 +234,11 @@ export const FOOD_CATALOG: CatalogFoodItem[] = [
   },
   {
     id: 'sweet-potato',
-    barcode: '0003344556677',
+    barcode: '', // Generic food: no verified product UPC.
     name: 'Roasted Sweet Potato',
+    ingredients: ['sweet potato'],
     category: 'carb',
-    imageUrl: 'https://images.unsplash.com/photo-1596560548464-f010549b84d7?auto=format&fit=crop&w=600&q=80',
+    imageUrl: '/images/foods/sweet-potato.webp',
     cookingOptions: [cookBaked(5, 45, 400), cookBoiled(5, 20), cookAirFried(5, 20, 400)],
     dietaryTags: tags(),
     portionRaw: '200g (raw)',
@@ -247,10 +254,11 @@ export const FOOD_CATALOG: CatalogFoodItem[] = [
   },
   {
     id: 'whole-wheat-bread',
-    barcode: '0004455667788',
+    barcode: '', // Generic food: no verified product UPC.
     name: 'Whole Wheat Toast',
+    ingredients: ['whole wheat flour'],
     category: 'carb',
-    imageUrl: 'https://images.unsplash.com/photo-1584776296944-ab6fb57b0bdd?auto=format&fit=crop&w=600&q=80',
+    imageUrl: '/images/foods/wholegrain-bread.webp',
     cookingOptions: [cookBaked(0, 3, 400)],
     dietaryTags: tags({ allergens: ['wheat'], containsGluten: true, isHighFodmap: true }),
     portionRaw: '2 slices (70g)',
@@ -267,10 +275,11 @@ export const FOOD_CATALOG: CatalogFoodItem[] = [
   // ---- Fat ----
   {
     id: 'almonds',
-    barcode: '0005566778899',
+    barcode: '', // Generic food: no verified product UPC.
     name: 'Raw Almonds',
+    ingredients: ['almonds'],
     category: 'fat',
-    imageUrl: DEFAULT_FOOD_IMAGE,
+    imageUrl: '/images/foods/almonds.webp',
     cookingOptions: [cookRaw(), cookBaked(2, 10, 325)],
     dietaryTags: tags({ allergens: ['tree_nuts'] }),
     portionRaw: '28g',
@@ -286,10 +295,11 @@ export const FOOD_CATALOG: CatalogFoodItem[] = [
   },
   {
     id: 'avocado',
-    barcode: '0006677889900',
+    barcode: '', // Generic food: no verified product UPC.
     name: 'Avocado (Half)',
+    ingredients: ['avocado'],
     category: 'fat',
-    imageUrl: 'https://images.unsplash.com/photo-1523049673857-eb18f1d7b578?auto=format&fit=crop&w=600&q=80',
+    imageUrl: '/images/foods/avocado.webp',
     cookingOptions: [cookRaw()],
     dietaryTags: tags({ isHighFodmap: true }),
     portionRaw: '100g (raw)',
@@ -305,10 +315,11 @@ export const FOOD_CATALOG: CatalogFoodItem[] = [
   },
   {
     id: 'peanut-butter',
-    barcode: '0007788990011',
+    barcode: '', // Generic food: no verified product UPC.
     name: 'Peanut Butter (2 tbsp)',
+    ingredients: ['peanuts'],
     category: 'fat',
-    imageUrl: DEFAULT_FOOD_IMAGE,
+    imageUrl: '/images/foods/peanut-butter.webp',
     cookingOptions: [cookRaw()],
     dietaryTags: tags({ allergens: ['peanuts'] }),
     portionRaw: '32g',
@@ -325,10 +336,11 @@ export const FOOD_CATALOG: CatalogFoodItem[] = [
   // ---- Vegetable ----
   {
     id: 'roasted-veggies',
-    barcode: '0006667778889',
+    barcode: '', // Generic food: no verified product UPC.
     name: 'Roasted Mixed Vegetables',
+    ingredients: ['broccoli', 'carrot', 'bell pepper', 'garlic'],
     category: 'vegetable',
-    imageUrl: 'https://images.unsplash.com/photo-1540420773420-3366772f4999?auto=format&fit=crop&w=600&q=80',
+    imageUrl: '/images/foods/roasted-vegetables.webp',
     cookingOptions: [cookBaked(10, 25, 425), cookAirFried(8, 15, 400)],
     dietaryTags: tags({ isHighFodmap: true, isGerdTrigger: true, spiceLevel: 'medium' }),
     portionRaw: '200g (raw)',
@@ -344,10 +356,11 @@ export const FOOD_CATALOG: CatalogFoodItem[] = [
   },
   {
     id: 'broccoli',
-    barcode: '0008899001122',
+    barcode: '', // Generic food: no verified product UPC.
     name: 'Steamed Broccoli',
+    ingredients: ['broccoli'],
     category: 'vegetable',
-    imageUrl: DEFAULT_FOOD_IMAGE,
+    imageUrl: '/images/foods/broccoli.webp',
     cookingOptions: [cookSteamed(2, 6), cookBoiled(2, 5), cookBaked(5, 20, 425)],
     dietaryTags: tags({ isHighFodmap: true }),
     portionRaw: '180g (raw)',
@@ -363,10 +376,11 @@ export const FOOD_CATALOG: CatalogFoodItem[] = [
   },
   {
     id: 'spinach-salad',
-    barcode: '0009900112233',
+    barcode: '', // Generic food: no verified product UPC.
     name: 'Spinach Salad Mix',
+    ingredients: ['spinach', 'cucumber', 'tomato'],
     category: 'vegetable',
-    imageUrl: DEFAULT_FOOD_IMAGE,
+    imageUrl: '/images/foods/spinach.webp',
     cookingOptions: [cookRaw(), cookPanFried(2, 3, 2)],
     dietaryTags: tags(),
     portionRaw: '85g (raw)',
@@ -383,10 +397,11 @@ export const FOOD_CATALOG: CatalogFoodItem[] = [
   // ---- Snack ----
   {
     id: 'pretzels',
-    barcode: '0007778889990',
+    barcode: '', // Generic food: no verified product UPC.
     name: 'Mini Pretzels',
+    ingredients: ['wheat flour'],
     category: 'snack',
-    imageUrl: DEFAULT_FOOD_IMAGE,
+    imageUrl: '/images/foods/pretzels.webp',
     cookingOptions: [cookRaw()],
     dietaryTags: tags({ allergens: ['wheat'], containsGluten: true }),
     portionRaw: '30g',
@@ -402,10 +417,11 @@ export const FOOD_CATALOG: CatalogFoodItem[] = [
   },
   {
     id: 'greek-yogurt',
-    barcode: '0008889990001',
+    barcode: '', // Generic food: no verified product UPC.
     name: 'Greek Yogurt Cup',
+    ingredients: ['milk'],
     category: 'snack',
-    imageUrl: 'https://images.unsplash.com/photo-1488477181946-6428a0291777?auto=format&fit=crop&w=600&q=80',
+    imageUrl: '/images/foods/greek-yogurt.webp',
     cookingOptions: [cookRaw()],
     dietaryTags: tags({ allergens: ['milk'], containsLactose: true }),
     portionRaw: '170g',
@@ -421,10 +437,11 @@ export const FOOD_CATALOG: CatalogFoodItem[] = [
   },
   {
     id: 'trail-mix',
-    barcode: '0009990001112',
+    barcode: '', // Generic food: no verified product UPC.
     name: 'Trail Mix',
+    ingredients: ['almonds', 'peanuts', 'cashews', 'raisins', 'chocolate'],
     category: 'snack',
-    imageUrl: DEFAULT_FOOD_IMAGE,
+    imageUrl: '/images/foods/trail-mix.webp',
     cookingOptions: [cookRaw()],
     dietaryTags: tags({ allergens: ['tree_nuts', 'peanuts'] }),
     portionRaw: '40g',
@@ -440,10 +457,11 @@ export const FOOD_CATALOG: CatalogFoodItem[] = [
   },
   {
     id: 'jerky',
-    barcode: '0000112223335',
+    barcode: '', // Generic food: no verified product UPC.
     name: 'Beef Jerky',
+    ingredients: ['beef', 'soy sauce'],
     category: 'snack',
-    imageUrl: DEFAULT_FOOD_IMAGE,
+    imageUrl: '/images/foods/beef-jerky.webp',
     cookingOptions: [cookRaw()],
     dietaryTags: tags({ allergens: ['soy'], isGerdTrigger: true, spiceLevel: 'mild' }),
     portionRaw: '28g',
@@ -459,12 +477,13 @@ export const FOOD_CATALOG: CatalogFoodItem[] = [
   },
   {
     id: 'rice-cakes',
-    barcode: '0001223344556',
+    barcode: '', // Generic food: no verified product UPC.
     name: 'Salted Rice Cakes',
+    ingredients: ['brown rice', 'salt'],
     category: 'snack',
-    imageUrl: DEFAULT_FOOD_IMAGE,
+    imageUrl: '/images/foods/rice-cakes.webp',
     cookingOptions: [cookRaw()],
-    dietaryTags: tags({ allergens: ['wheat'], containsGluten: true }),
+    dietaryTags: tags({}), // Plain rice-and-salt recipe; check packaged labels for cross-contact.
     portionRaw: '2 cakes (18g)',
     caloriesRaw: 70,
     portionCooked: '2 cakes (18g)',
@@ -489,7 +508,7 @@ export interface SafeSwapSuggestion {
 export const SAFE_SWAPS: Record<string, SafeSwapSuggestion> = {
   'greek-yogurt': {
     alternativeName: 'Coconut Yogurt (Dairy-Free)',
-    reason: 'Lactose-free, plant-based yogurt with a similar protein profile.',
+    reason: 'Dairy-free option; protein content varies, so check the label.',
   },
   'whole-wheat-bread': {
     alternativeName: 'Certified Gluten-Free Bread',

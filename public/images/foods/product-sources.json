@@ -1,0 +1,83 @@
+[
+  {
+    "id": "nut-tuna-canned",
+    "ok": true,
+    "file": "/images/foods/starkist-tuna.webp",
+    "brand": "StarKist",
+    "matched_product": "StarKist Chunk Light Tuna in Water (Can)",
+    "source_page_url": "https://starkist.com/product/chunk-light-tuna-in-water-can/",
+    "usage": "Real product image; flavor, market, package size and serving may vary. Photo does not verify nutrition."
+  },
+  {
+    "id": "nut-whole-milk",
+    "ok": true,
+    "file": "/images/foods/horizon-whole-milk.webp",
+    "brand": "Horizon Organic",
+    "matched_product": "Horizon Organic Whole Milk, 1 gallon jug (High Vitamin D; Ultra-Pasteurized)",
+    "source_page_url": "https://horizon.com/organic-dairy-products/organic-milk/organic-whole-milk/",
+    "usage": "Real product image; flavor, market, package size and serving may vary. Photo does not verify nutrition."
+  },
+  {
+    "id": "nut-protein-bar",
+    "ok": true,
+    "file": "/images/foods/quest-protein-bar.webp",
+    "brand": "Quest",
+    "matched_product": "Quest Chocolate Chip Cookie Dough Flavored Protein Bar (4-count box, 60 g bar)",
+    "source_page_url": "https://www.questnutrition.com/products/chocolate-chip-cookie-dough-protein-bar",
+    "usage": "Real product image; flavor, market, package size and serving may vary. Photo does not verify nutrition."
+  },
+  {
+    "id": "nut-mcdonalds-fries",
+    "ok": true,
+    "file": "/images/foods/mcdonalds-fries.webp",
+    "brand": "McDonald's",
+    "matched_product": "McDonald's USA World Famous Fries\u00ae (Medium)",
+    "source_page_url": "https://www.mcdonalds.com/us/en-us/product/medium-french-fries.html",
+    "usage": "Real product image; flavor, market, package size and serving may vary. Photo does not verify nutrition."
+  },
+  {
+    "id": "sup-whey-protein",
+    "ok": true,
+    "file": "/images/foods/whey-protein-isolate.webp",
+    "brand": "Optimum Nutrition",
+    "matched_product": "Optimum Nutrition Gold Standard 100% Isolate, Rich Vanilla, 2.91 lb (44 servings) whey protein isolate powder",
+    "source_page_url": "https://www.optimumnutrition.com/en-us/products/gold-standard-100-isolate-whey-protein-powder",
+    "usage": "Real product image; flavor, market, package size and serving may vary. Photo does not verify nutrition."
+  },
+  {
+    "id": "sup-creatine",
+    "ok": true,
+    "file": "/images/foods/creatine-us.webp",
+    "brand": "MuscleTech",
+    "matched_product": "MuscleTech Platinum 100% Creatine, unflavored, current US 5 g product packaging",
+    "source_page_url": "https://www.muscletech.com/products/platinum-100-creatine",
+    "usage": "Actual current US 5 g product-family image; 80/90 package count varies. Photo does not verify full nutrition."
+  },
+  {
+    "id": "sup-pre-workout",
+    "ok": true,
+    "file": "/images/foods/pre-workout.webp",
+    "brand": "Cellucor",
+    "matched_product": "Cellucor C4 Original Pre-Workout, Icy Blue Razz, 30 servings (current 5th Gen formula)",
+    "source_page_url": "https://cellucor.com/products/c4-original",
+    "usage": "Real product image; flavor, market, package size and serving may vary. Photo does not verify nutrition."
+  },
+  {
+    "id": "sup-bcaa",
+    "ok": true,
+    "file": "/images/foods/bcaa.webp",
+    "brand": "Scivation (XTEND)",
+    "matched_product": "XTEND Original BCAA Powder, Blue Raspberry Ice, 30 Servings",
+    "source_page_url": "https://cellucor.com/products/xtend-original",
+    "usage": "Real product image; flavor, market, package size and serving may vary. Photo does not verify nutrition."
+  },
+  {
+    "id": "sup-fish-oil",
+    "ok": true,
+    "file": "/images/foods/omega-3.webp",
+    "brand": "Nordic Naturals",
+    "matched_product": "Nordic Naturals Omega-3 Lemon Soft Gels, 60 Count (690 mg total omega-3s per 2 soft gels)",
+    "source_page_url": "https://www.nordic.com/products/omega-3/",
+    "usage": "Real product image; flavor, market, package size and serving may vary. Photo does not verify nutrition."
+  }
+]

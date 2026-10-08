@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useMealPlannerStore } from '@/store/useMealPlannerStore';
 import {
   calculateMetabolicSummary,
@@ -9,7 +9,20 @@ import {
   kgToLbs,
   lbsToKg,
 } from '@/lib/fitnessMealPlanner';
-import type { Goal, SnackCraving, Allergen, GICondition, SpiceLevel } from '@/lib/fitnessMealPlanner';
+import type {
+  Goal,
+  SnackCraving,
+  Allergen,
+  GICondition,
+  SpiceLevel,
+  UserProfile,
+} from '@/lib/fitnessMealPlanner';
+import {
+  MealPlannerValidationError,
+  assertFiniteNumber,
+  isMealPlannerValidationError,
+  validateProfile,
+} from '@/lib/mealPlannerValidation';
 import { STORE_LABELS, STORE_NAMES } from '@/lib/stores';
 import { formatLabel } from '@/lib/format';
 import Card from './ui/Card';
@@ -52,116 +65,293 @@ const GI_CONDITIONS: GICondition[] = [
 
 const SPICE_LEVELS: SpiceLevel[] = ['none', 'mild', 'medium', 'spicy'];
 
-export default function ProfileSetupForm() {
-  const profile = useMealPlannerStore((s) => s.profile);
-  const updateProfile = useMealPlannerStore((s) => s.updateProfile);
-  const setGoal = useMealPlannerStore((s) => s.setGoal);
-  const setPreferredStore = useMealPlannerStore((s) => s.setPreferredStore);
-  const toggleSnackCraving = useMealPlannerStore((s) => s.toggleSnackCraving);
-  const toggleAllergen = useMealPlannerStore((s) => s.toggleAllergen);
-  const toggleGICondition = useMealPlannerStore((s) => s.toggleGICondition);
-  const setSpiceLevel = useMealPlannerStore((s) => s.setSpiceLevel);
-  const setCustomExclusions = useMealPlannerStore((s) => s.setCustomExclusions);
+type DraftField = 'fullName' | 'height' | 'weightLbs' | 'age' | 'activityLevel' | 'customExclusions' | 'form';
 
-  const [exclusionInput, setExclusionInput] = useState('');
+type ProfileDraft = {
+  fullName: string;
+  heightFeet: string;
+  heightInches: string;
+  weightLbs: string;
+  age: string;
+  gender: UserProfile['gender'];
+  activityLevel: string;
+  goal: Goal;
+  snackCravings: SnackCraving[];
+  dietaryRestrictions: string[];
+  preferredStore: UserProfile['preferredStore'];
+  majorAllergens: Allergen[];
+  giConditions: GICondition[];
+  spiceLevel: SpiceLevel;
+  customExclusions: string[];
+};
 
-  const [heightFeet, setHeightFeet] = useState(() => cmToFeetInches(profile.heightCm).feet);
-  const [heightInches, setHeightInches] = useState(() => cmToFeetInches(profile.heightCm).inches);
-  const [weightLbs, setWeightLbs] = useState(() => Math.round(kgToLbs(profile.currentWeightKg)));
-
-  const summary = useMemo(() => calculateMetabolicSummary(profile), [profile]);
-
-  const handleHeightChange = (feet: number, inches: number) => {
-    setHeightFeet(feet);
-    setHeightInches(inches);
-    updateProfile({ heightCm: feetInchesToCm(feet, inches) });
+function profileToDraft(profile: UserProfile): ProfileDraft {
+  const { feet, inches } = cmToFeetInches(profile.heightCm);
+  return {
+    fullName: profile.fullName,
+    heightFeet: String(feet),
+    heightInches: String(inches),
+    weightLbs: String(Math.round(kgToLbs(profile.currentWeightKg) * 10) / 10),
+    age: String(profile.age),
+    gender: profile.gender,
+    activityLevel: String(profile.activityLevel),
+    goal: profile.goal,
+    snackCravings: [...profile.snackCravings],
+    dietaryRestrictions: [...profile.dietaryRestrictions],
+    preferredStore: profile.preferredStore,
+    majorAllergens: [...profile.majorAllergens],
+    giConditions: [...profile.giConditions],
+    spiceLevel: profile.spiceLevel,
+    customExclusions: [...profile.customExclusions],
   };
+}
 
-  const handleWeightChange = (lbs: number) => {
-    setWeightLbs(lbs);
-    updateProfile({ currentWeightKg: lbsToKg(lbs) });
+function arraysMatch(left: string[], right: string[]): boolean {
+  return left.length === right.length && left.every((value, index) => value === right[index]);
+}
+
+function draftsMatch(left: ProfileDraft, right: ProfileDraft): boolean {
+  return left.fullName === right.fullName
+    && left.heightFeet === right.heightFeet
+    && left.heightInches === right.heightInches
+    && left.weightLbs === right.weightLbs
+    && left.age === right.age
+    && left.gender === right.gender
+    && left.activityLevel === right.activityLevel
+    && left.goal === right.goal
+    && left.preferredStore === right.preferredStore
+    && left.spiceLevel === right.spiceLevel
+    && arraysMatch(left.snackCravings, right.snackCravings)
+    && arraysMatch(left.dietaryRestrictions, right.dietaryRestrictions)
+    && arraysMatch(left.majorAllergens, right.majorAllergens)
+    && arraysMatch(left.giConditions, right.giConditions)
+    && arraysMatch(left.customExclusions, right.customExclusions);
+}
+
+function readDraftNumber(
+  rawValue: string,
+  field: string,
+  options: { min?: number; max?: number; allowZero?: boolean } = {},
+): number {
+  const value = rawValue.trim();
+  if (!value) throw new MealPlannerValidationError(`${field} is required.`);
+  return assertFiniteNumber(Number(value), field, options);
+}
+
+/** Converts display units only; shared validateProfile remains the profile authority. */
+function draftToCandidate(draft: ProfileDraft): Partial<UserProfile> {
+  const heightFeet = readDraftNumber(draft.heightFeet, 'Height (feet)', { min: 0, max: 10, allowZero: true });
+  // Extra inches are intentionally accepted and normalized by conversion after a successful save.
+  const heightInches = readDraftNumber(draft.heightInches, 'Height (inches)', { min: 0, max: 119, allowZero: true });
+
+  return {
+    fullName: draft.fullName,
+    heightCm: feetInchesToCm(heightFeet, heightInches),
+    currentWeightKg: lbsToKg(readDraftNumber(draft.weightLbs, 'Weight')),
+    age: readDraftNumber(draft.age, 'Age'),
+    gender: draft.gender,
+    activityLevel: readDraftNumber(draft.activityLevel, 'Activity level'),
+    goal: draft.goal,
+    snackCravings: [...draft.snackCravings],
+    dietaryRestrictions: [...draft.dietaryRestrictions],
+    preferredStore: draft.preferredStore,
+    majorAllergens: [...draft.majorAllergens],
+    giConditions: [...draft.giConditions],
+    spiceLevel: draft.spiceLevel,
+    customExclusions: [...draft.customExclusions],
+  };
+}
+
+function fieldForValidationError(error: unknown): DraftField {
+  const message = error instanceof Error ? error.message : '';
+  if (/full name/i.test(message)) return 'fullName';
+  if (/height/i.test(message)) return 'height';
+  if (/weight/i.test(message)) return 'weightLbs';
+  if (/age/i.test(message)) return 'age';
+  if (/activity/i.test(message)) return 'activityLevel';
+  if (/custom exclusions/i.test(message)) return 'customExclusions';
+  return 'form';
+}
+
+function toggleValue<T extends string>(items: T[], item: T): T[] {
+  return items.includes(item) ? items.filter((current) => current !== item) : [...items, item];
+}
+
+export default function ProfileSetupForm() {
+  const profile = useMealPlannerStore((state) => state.profile);
+  const updateProfile = useMealPlannerStore((state) => state.updateProfile);
+
+  const [draft, setDraft] = useState<ProfileDraft>(() => profileToDraft(profile));
+  const [exclusionInput, setExclusionInput] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<DraftField, string>>>({});
+  const [saveStatus, setSaveStatus] = useState<'saved' | 'unsaved'>('saved');
+  const hasActiveEdits = useRef(false);
+  const latestDraft = useRef(draft);
+
+  useEffect(() => { latestDraft.current = draft; }, [draft]);
+
+  const savedDraft = useMemo(() => profileToDraft(profile), [profile]);
+  const hasUnsavedChanges = !draftsMatch(draft, savedDraft);
+
+  // Hydration replaces the default store profile after first client render. Adopt that
+  // profile only while this form has no active edits, so a user's in-progress draft wins.
+  useEffect(() => {
+    if (hasActiveEdits.current && !draftsMatch(latestDraft.current, profileToDraft(profile))) return;
+    hasActiveEdits.current = false;
+    setDraft(profileToDraft(profile));
+    setFieldErrors({});
+    setSaveStatus('saved');
+  }, [profile]);
+
+  const summary = useMemo(() => {
+    try {
+      return calculateMetabolicSummary(validateProfile(draftToCandidate(draft), profile));
+    } catch {
+      // Never render calculations based on an invalid transient draft; retain saved values instead.
+      return calculateMetabolicSummary(profile);
+    }
+  }, [draft, profile]);
+
+  const changeDraft = (change: (current: ProfileDraft) => ProfileDraft, fields: DraftField[] = []) => {
+    hasActiveEdits.current = true;
+    setDraft(change);
+    setSaveStatus('unsaved');
+    if (fields.length) {
+      setFieldErrors((current) => {
+        const next = { ...current };
+        fields.forEach((field) => delete next[field]);
+        delete next.form;
+        return next;
+      });
+    }
   };
 
   const addExclusion = () => {
     const value = exclusionInput.trim();
-    if (!value || profile.customExclusions.includes(value)) return;
-    setCustomExclusions([...profile.customExclusions, value]);
+    if (!value) {
+      setFieldErrors((current) => ({ ...current, customExclusions: 'Enter an ingredient to exclude.' }));
+      return;
+    }
+    if (draft.customExclusions.some((item) => item.toLowerCase() === value.toLowerCase())) {
+      setFieldErrors((current) => ({ ...current, customExclusions: 'That ingredient is already excluded.' }));
+      return;
+    }
+    changeDraft((current) => ({ ...current, customExclusions: [...current.customExclusions, value] }), ['customExclusions']);
     setExclusionInput('');
   };
 
   const removeExclusion = (value: string) => {
-    setCustomExclusions(profile.customExclusions.filter((item) => item !== value));
+    changeDraft(
+      (current) => ({ ...current, customExclusions: current.customExclusions.filter((item) => item !== value) }),
+      ['customExclusions'],
+    );
   };
-
-  const [isSaved, setIsSaved] = useState(false);
 
   const handleSaveProfile = () => {
-    setIsSaved(true);
-    setTimeout(() => setIsSaved(false), 3000);
+    try {
+      // This validates all current draft preferences plus converted display units before one store commit.
+      const validatedProfile = validateProfile(draftToCandidate(draft), profile);
+      updateProfile(validatedProfile);
+      hasActiveEdits.current = false;
+      setDraft(profileToDraft(validatedProfile));
+      setFieldErrors({});
+      setSaveStatus('saved');
+    } catch (error) {
+      const message = isMealPlannerValidationError(error) || error instanceof Error
+        ? error.message
+        : 'Unable to save your profile. Please review the fields and try again.';
+      setFieldErrors({ [fieldForValidationError(error)]: message });
+      setSaveStatus('unsaved');
+    }
   };
+
+  const statusText = hasUnsavedChanges || saveStatus === 'unsaved' ? 'Unsaved changes.' : 'Profile saved.';
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
       <Card title="Your Profile" subtitle="Update your stats to recalculate targets live" className="lg:col-span-3">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Field label="Full Name" full>
+          <Field label="Full Name" full error={fieldErrors.fullName} errorId="profile-full-name-error">
             <input
               type="text"
-              value={profile.fullName}
-              onChange={(e) => updateProfile({ fullName: e.target.value })}
+              value={draft.fullName}
+              onChange={(event) => changeDraft((current) => ({ ...current, fullName: event.target.value }), ['fullName'])}
               placeholder="e.g. Jordan Smith"
               className="input"
+              aria-label="Full Name"
+              aria-invalid={Boolean(fieldErrors.fullName)}
+              aria-describedby={fieldErrors.fullName ? 'profile-full-name-error' : undefined}
             />
           </Field>
-          <Field label="Height (ft / in)">
+          <Field label="Height (ft / in)" error={fieldErrors.height} errorId="profile-height-error">
             <div className="flex gap-2">
               <input
-                type="number"
-                value={heightFeet}
-                onChange={(e) => handleHeightChange(Number(e.target.value), heightInches)}
+                type="text"
+                inputMode="numeric"
+                value={draft.heightFeet}
+                onChange={(event) => changeDraft((current) => ({ ...current, heightFeet: event.target.value }), ['height'])}
                 className="input"
                 placeholder="ft"
+                aria-label="Height feet"
+                aria-invalid={Boolean(fieldErrors.height)}
+                aria-describedby={fieldErrors.height ? 'profile-height-error' : undefined}
               />
               <input
-                type="number"
-                value={heightInches}
-                onChange={(e) => handleHeightChange(heightFeet, Number(e.target.value))}
+                type="text"
+                inputMode="numeric"
+                value={draft.heightInches}
+                onChange={(event) => changeDraft((current) => ({ ...current, heightInches: event.target.value }), ['height'])}
                 className="input"
                 placeholder="in"
+                aria-label="Height inches"
+                aria-invalid={Boolean(fieldErrors.height)}
+                aria-describedby={fieldErrors.height ? 'profile-height-error' : undefined}
               />
             </div>
           </Field>
-          <Field label="Weight (lbs)">
+          <Field label="Weight (lbs)" error={fieldErrors.weightLbs} errorId="profile-weight-error">
             <input
-              type="number"
-              value={weightLbs}
-              onChange={(e) => handleWeightChange(Number(e.target.value))}
+              type="text"
+              inputMode="decimal"
+              value={draft.weightLbs}
+              onChange={(event) => changeDraft((current) => ({ ...current, weightLbs: event.target.value }), ['weightLbs'])}
               className="input"
+              aria-label="Weight (lbs)"
+              aria-invalid={Boolean(fieldErrors.weightLbs)}
+              aria-describedby={fieldErrors.weightLbs ? 'profile-weight-error' : undefined}
             />
           </Field>
-          <Field label="Age">
+          <Field label="Age" error={fieldErrors.age} errorId="profile-age-error">
             <input
-              type="number"
-              value={profile.age}
-              onChange={(e) => updateProfile({ age: Number(e.target.value) })}
+              type="text"
+              inputMode="numeric"
+              value={draft.age}
+              onChange={(event) => changeDraft((current) => ({ ...current, age: event.target.value }), ['age'])}
               className="input"
+              aria-label="Age"
+              aria-invalid={Boolean(fieldErrors.age)}
+              aria-describedby={fieldErrors.age ? 'profile-age-error' : undefined}
             />
           </Field>
           <Field label="Gender">
             <select
-              value={profile.gender}
-              onChange={(e) => updateProfile({ gender: e.target.value as 'male' | 'female' })}
+              value={draft.gender}
+              onChange={(event) => changeDraft((current) => ({ ...current, gender: event.target.value as UserProfile['gender'] }))}
               className="input"
+              aria-label="Gender"
             >
               <option value="male">Male</option>
               <option value="female">Female</option>
             </select>
           </Field>
-          <Field label="Activity Level" full>
+          <Field label="Activity Level" full error={fieldErrors.activityLevel} errorId="profile-activity-error">
             <select
-              value={profile.activityLevel}
-              onChange={(e) => updateProfile({ activityLevel: Number(e.target.value) })}
+              value={draft.activityLevel}
+              onChange={(event) => changeDraft((current) => ({ ...current, activityLevel: event.target.value }), ['activityLevel'])}
               className="input"
+              aria-label="Activity Level"
+              aria-invalid={Boolean(fieldErrors.activityLevel)}
+              aria-describedby={fieldErrors.activityLevel ? 'profile-activity-error' : undefined}
             >
               {ACTIVITY_LEVELS.map((level) => (
                 <option key={level.value} value={level.value}>
@@ -172,18 +362,19 @@ export default function ProfileSetupForm() {
           </Field>
           <Field label="Goal" full>
             <div className="flex flex-wrap gap-2">
-              {GOALS.map((g) => (
+              {GOALS.map((goal) => (
                 <button
-                  key={g.value}
+                  key={goal.value}
                   type="button"
-                  onClick={() => setGoal(g.value)}
+                  onClick={() => changeDraft((current) => ({ ...current, goal: goal.value }))}
+                  aria-pressed={draft.goal === goal.value}
                   className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                    profile.goal === g.value
+                    draft.goal === goal.value
                       ? 'bg-accent text-white'
                       : 'bg-white/5 text-slate-300 hover:bg-white/10'
                   }`}
                 >
-                  {g.label}
+                  {goal.label}
                 </button>
               ))}
             </div>
@@ -194,9 +385,10 @@ export default function ProfileSetupForm() {
                 <button
                   key={store}
                   type="button"
-                  onClick={() => setPreferredStore(store)}
+                  onClick={() => changeDraft((current) => ({ ...current, preferredStore: store }))}
+                  aria-pressed={draft.preferredStore === store}
                   className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                    profile.preferredStore === store
+                    draft.preferredStore === store
                       ? 'bg-accent text-white'
                       : 'bg-white/5 text-slate-300 hover:bg-white/10'
                   }`}
@@ -209,7 +401,7 @@ export default function ProfileSetupForm() {
           <Field label="Snack Cravings" full>
             <div className="flex flex-wrap gap-2">
               {SNACK_CRAVINGS.map((craving) => {
-                const active = profile.snackCravings.includes(craving);
+                const active = draft.snackCravings.includes(craving);
                 return (
                   <label
                     key={craving}
@@ -223,7 +415,10 @@ export default function ProfileSetupForm() {
                       type="checkbox"
                       className="mr-2 accent-accent-green"
                       checked={active}
-                      onChange={() => toggleSnackCraving(craving)}
+                      onChange={() => changeDraft((current) => ({
+                        ...current,
+                        snackCravings: toggleValue(current.snackCravings, craving),
+                      }))}
                     />
                     {craving.replace('_', ' ')}
                   </label>
@@ -233,21 +428,24 @@ export default function ProfileSetupForm() {
           </Field>
         </div>
 
-        <button
-          type="button"
-          onClick={handleSaveProfile}
-          className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-accent px-4 py-3 font-semibold text-white shadow-lg shadow-accent/30 transition-colors duration-200 hover:bg-accent/90"
-        >
-          {isSaved ? (
-            <span className="flex items-center gap-2">✓ Profile Saved!</span>
-          ) : (
-            'Save Profile Changes'
-          )}
-        </button>
+        <div className="mt-6 space-y-2">
+          <button
+            type="button"
+            onClick={handleSaveProfile}
+            aria-label="Save profile changes"
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-accent px-4 py-3 font-semibold text-white shadow-lg shadow-accent/30 transition-colors duration-200 hover:bg-accent/90"
+          >
+            Save Profile Changes
+          </button>
+          <p className={statusText === 'Profile saved.' ? 'text-center text-sm text-accent-green' : 'text-center text-sm text-accent-amber'} role="status" aria-live="polite">
+            {statusText}
+          </p>
+          {fieldErrors.form && <p className="text-sm text-accent-red" role="alert">{fieldErrors.form}</p>}
+        </div>
       </Card>
 
       <div className="space-y-6 lg:col-span-2">
-        <Card title="Live Metabolic Summary" subtitle="Updates automatically as you edit your profile">
+        <Card title="Live Metabolic Summary" subtitle="Updates automatically from valid profile edits">
           <div className="space-y-3">
             <Stat label="BMR" value={`${Math.round(summary.bmr)} kcal`} />
             <Stat label="TDEE" value={`${Math.round(summary.tdee)} kcal`} />
@@ -283,7 +481,7 @@ export default function ProfileSetupForm() {
           <Field label="Major Allergens" full>
             <div className="flex flex-wrap gap-2">
               {MAJOR_ALLERGENS.map((allergen) => {
-                const active = profile.majorAllergens.includes(allergen);
+                const active = draft.majorAllergens.includes(allergen);
                 return (
                   <label
                     key={allergen}
@@ -297,7 +495,10 @@ export default function ProfileSetupForm() {
                       type="checkbox"
                       className="mr-2 accent-accent-red"
                       checked={active}
-                      onChange={() => toggleAllergen(allergen)}
+                      onChange={() => changeDraft((current) => ({
+                        ...current,
+                        majorAllergens: toggleValue(current.majorAllergens, allergen),
+                      }))}
                     />
                     {formatLabel(allergen)}
                   </label>
@@ -309,7 +510,7 @@ export default function ProfileSetupForm() {
           <Field label="GI Conditions" full>
             <div className="flex flex-wrap gap-2">
               {GI_CONDITIONS.map((condition) => {
-                const active = profile.giConditions.includes(condition);
+                const active = draft.giConditions.includes(condition);
                 return (
                   <label
                     key={condition}
@@ -323,7 +524,10 @@ export default function ProfileSetupForm() {
                       type="checkbox"
                       className="mr-2 accent-accent-amber"
                       checked={active}
-                      onChange={() => toggleGICondition(condition)}
+                      onChange={() => changeDraft((current) => ({
+                        ...current,
+                        giConditions: toggleValue(current.giConditions, condition),
+                      }))}
                     />
                     {formatLabel(condition)}
                   </label>
@@ -338,9 +542,10 @@ export default function ProfileSetupForm() {
                 <button
                   key={level}
                   type="button"
-                  onClick={() => setSpiceLevel(level)}
+                  onClick={() => changeDraft((current) => ({ ...current, spiceLevel: level }))}
+                  aria-pressed={draft.spiceLevel === level}
                   className={`rounded-lg px-3 py-2 text-sm font-medium capitalize transition-colors ${
-                    profile.spiceLevel === level
+                    draft.spiceLevel === level
                       ? 'bg-accent text-white'
                       : 'bg-white/5 text-slate-300 hover:bg-white/10'
                   }`}
@@ -351,20 +556,26 @@ export default function ProfileSetupForm() {
             </div>
           </Field>
 
-          <Field label="Custom Exclusions (typed ingredients)">
+          <Field label="Custom Exclusions (typed ingredients)" error={fieldErrors.customExclusions} errorId="profile-exclusions-error">
             <div className="flex gap-2">
               <input
                 type="text"
                 value={exclusionInput}
-                onChange={(e) => setExclusionInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
+                onChange={(event) => {
+                  setExclusionInput(event.target.value);
+                  setFieldErrors((current) => ({ ...current, customExclusions: undefined }));
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault();
                     addExclusion();
                   }
                 }}
                 placeholder="e.g. cilantro"
                 className="input"
+                aria-label="Custom exclusion"
+                aria-invalid={Boolean(fieldErrors.customExclusions)}
+                aria-describedby={fieldErrors.customExclusions ? 'profile-exclusions-error' : undefined}
               />
               <button
                 type="button"
@@ -374,9 +585,9 @@ export default function ProfileSetupForm() {
                 Add
               </button>
             </div>
-            {profile.customExclusions.length > 0 && (
+            {draft.customExclusions.length > 0 && (
               <div className="mt-2 flex flex-wrap gap-2">
-                {profile.customExclusions.map((item) => (
+                {draft.customExclusions.map((item) => (
                   <span
                     key={item}
                     className="flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs text-slate-200"
@@ -385,6 +596,7 @@ export default function ProfileSetupForm() {
                     <button
                       type="button"
                       onClick={() => removeExclusion(item)}
+                      aria-label={`Remove ${item} exclusion`}
                       className="text-slate-400 hover:text-accent-red"
                     >
                       ✕
@@ -400,11 +612,24 @@ export default function ProfileSetupForm() {
   );
 }
 
-function Field({ label, children, full }: { label: string; children: React.ReactNode; full?: boolean }) {
+function Field({
+  label,
+  children,
+  full,
+  error,
+  errorId,
+}: {
+  label: string;
+  children: ReactNode;
+  full?: boolean;
+  error?: string;
+  errorId?: string;
+}) {
   return (
     <div className={full ? 'sm:col-span-2' : ''}>
-      <label className="mb-1.5 block text-sm font-medium text-slate-300">{label}</label>
+      <div className="mb-1.5 text-sm font-medium text-slate-300">{label}</div>
       {children}
+      {error && <p id={errorId} className="mt-1.5 text-sm text-accent-red" role="alert">{error}</p>}
     </div>
   );
 }
