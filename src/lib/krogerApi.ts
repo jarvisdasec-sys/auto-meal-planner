@@ -1,70 +1,21 @@
 /**
- * Kroger API integration for fetching real product images.
- * Uses OAuth 2.0 client credentials flow to authenticate with Kroger's API.
+ * Server-only Kroger product adapter. It intentionally exposes only exact product
+ * identity operations to the image resolver; callers must not treat a fuzzy name
+ * search's first result as the requested food.
  */
+
+import { normalizeUpc } from '@/types/foodImage';
 
 const KROGER_BASE_URL = 'https://api.kroger.com/v1';
-const KROGER_AUTH_URL = 'https://api.kroger.com/v1/connect/oauth2/authorize';
 const KROGER_TOKEN_URL = 'https://api.kroger.com/v1/connect/oauth2/token';
+const REQUEST_TIMEOUT_MS = 4_000;
 
-const KROGER_CLIENT_ID = process.env.NEXT_PUBLIC_KROGER_CLIENT_ID || '';
-const KROGER_CLIENT_SECRET = process.env.KROGER_CLIENT_SECRET || '';
+// KROGER_CLIENT_ID is the server-safe setting. The NEXT_PUBLIC spelling is read
+// only as a legacy compatibility fallback; no value is ever returned to clients.
+const KROGER_CLIENT_ID = process.env.KROGER_CLIENT_ID ?? process.env.NEXT_PUBLIC_KROGER_CLIENT_ID ?? '';
+const KROGER_CLIENT_SECRET = process.env.KROGER_CLIENT_SECRET ?? '';
 
-// Simple in-memory cache for OAuth tokens (expires after 30 minutes)
 let cachedToken: { accessToken: string; expiresAt: number } | null = null;
-
-/**
- * Get a valid OAuth 2.0 access token from Kroger's API using client credentials.
- * Tokens are cached and reused until expiration.
- */
-export async function getKrogerAccessToken(): Promise<string | null> {
-  // Check if we have a valid cached token
-  if (cachedToken && cachedToken.expiresAt > Date.now()) {
-    return cachedToken.accessToken;
-  }
-
-  if (!KROGER_CLIENT_ID || !KROGER_CLIENT_SECRET) {
-    console.warn('Kroger API credentials not configured. Skipping Kroger product lookup.');
-    return null;
-  }
-
-  try {
-    const params = new URLSearchParams({
-      grant_type: 'client_credentials',
-      scope: 'product.compact',
-    });
-
-    const response = await fetch(KROGER_TOKEN_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Authorization': `Basic ${Buffer.from(`${KROGER_CLIENT_ID}:${KROGER_CLIENT_SECRET}`).toString('base64')}`,
-      },
-      body: params.toString(),
-    });
-
-    if (!response.ok) {
-      console.error('Failed to get Kroger OAuth token:', response.statusText);
-      return null;
-    }
-
-    const data = (await response.json()) as {
-      access_token: string;
-      expires_in: number;
-    };
-
-    // Cache the token with a 5-minute buffer before expiry
-    cachedToken = {
-      accessToken: data.access_token,
-      expiresAt: Date.now() + (data.expires_in - 300) * 1000,
-    };
-
-    return data.access_token;
-  } catch (error) {
-    console.error('Error fetching Kroger OAuth token:', error);
-    return null;
-  }
-}
 
 export interface KrogerProduct {
   productId: string;
@@ -79,212 +30,172 @@ export interface KrogerProduct {
 interface KrogerApiImage {
   perspective?: string;
   featured?: boolean;
-  sizes?: Array<{
-    size?: string;
-    url?: string;
-  }>;
+  sizes?: Array<{ size?: string; url?: string }>;
 }
 
-function getKrogerImageUrl(images?: KrogerApiImage[]) {
-  if (!images || images.length === 0) return undefined;
+interface KrogerApiProduct {
+  productId?: string;
+  upc?: string;
+  name?: string;
+  brand?: string;
+  description?: string;
+  images?: KrogerApiImage[];
+  nutrition?: { calories?: number };
+}
 
-  const preferredImage =
+function requestSignal(): AbortSignal {
+  return AbortSignal.timeout(REQUEST_TIMEOUT_MS);
+}
+
+function getKrogerImageUrl(images?: KrogerApiImage[]): string | undefined {
+  if (!images?.length) return undefined;
+  const preferred =
     images.find((image) => image.featured && image.perspective === 'front') ??
     images.find((image) => image.perspective === 'front') ??
     images[0];
-
   return (
-    preferredImage.sizes?.find((size) => size.size === 'xlarge')?.url ??
-    preferredImage.sizes?.find((size) => size.size === 'large')?.url ??
-    preferredImage.sizes?.[0]?.url
+    preferred.sizes?.find((size) => size.size === 'xlarge')?.url ??
+    preferred.sizes?.find((size) => size.size === 'large')?.url ??
+    preferred.sizes?.[0]?.url
   );
 }
 
-/**
- * Search for a product by UPC/barcode on Kroger's API.
- * Returns product details including image URL if available.
- */
-export async function searchKrogerProductByUPC(upc: string): Promise<KrogerProduct | null> {
-  const token = await getKrogerAccessToken();
-  if (!token) return null;
+function toKrogerProduct(value: KrogerApiProduct): KrogerProduct | null {
+  const productId = typeof value.productId === 'string' ? value.productId : '';
+  const upc = normalizeUpc(value.upc);
+  const name = typeof value.name === 'string' ? value.name.trim() : '';
+  if (!productId || !upc || !name) return null;
+  return {
+    productId,
+    upc,
+    name,
+    brand: typeof value.brand === 'string' ? value.brand : undefined,
+    imageUrl: getKrogerImageUrl(value.images),
+    description: typeof value.description === 'string' ? value.description : undefined,
+    caloriesPerServing: typeof value.nutrition?.calories === 'number' ? value.nutrition.calories : undefined,
+  };
+}
+
+/** Get a cached OAuth token, or null when the optional provider is unavailable. */
+export async function getKrogerAccessToken(): Promise<string | null> {
+  if (cachedToken && cachedToken.expiresAt > Date.now()) return cachedToken.accessToken;
+  if (!KROGER_CLIENT_ID || !KROGER_CLIENT_SECRET) return null;
 
   try {
-    // Kroger's product search endpoint
-    const response = await fetch(
-      `${KROGER_BASE_URL}/products?filter.upc=${upc}`,
-      {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Accept': 'application/json',
-        },
+    const response = await fetch(KROGER_TOKEN_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Authorization: `Basic ${Buffer.from(`${KROGER_CLIENT_ID}:${KROGER_CLIENT_SECRET}`).toString('base64')}`,
       },
-    );
-
-    if (!response.ok) {
-      console.error('Kroger product search failed:', response.statusText);
-      return null;
-    }
-
-    const data = (await response.json()) as {
-      data?: Array<{
-        productId: string;
-        upc: string;
-        name: string;
-        brand?: string;
-        description?: string;
-        images?: KrogerApiImage[];
-        nutrition?: {
-          servingSize?: {
-            amount: number;
-            unit: string;
-          };
-          calories?: number;
-        };
-      }>;
+      body: new URLSearchParams({ grant_type: 'client_credentials', scope: 'product.compact' }).toString(),
+      signal: requestSignal(),
+    });
+    if (!response.ok) return null;
+    const data = (await response.json()) as { access_token?: unknown; expires_in?: unknown };
+    if (typeof data.access_token !== 'string' || !data.access_token) return null;
+    const expiresIn = typeof data.expires_in === 'number' && Number.isFinite(data.expires_in) ? data.expires_in : 300;
+    cachedToken = {
+      accessToken: data.access_token,
+      expiresAt: Date.now() + Math.max(30, expiresIn - 60) * 1000,
     };
-
-    if (!data.data || data.data.length === 0) {
-      return null;
-    }
-
-    const product = data.data[0];
-    const imageUrl = getKrogerImageUrl(product.images);
-
-    return {
-      productId: product.productId,
-      upc: product.upc,
-      name: product.name,
-      brand: product.brand,
-      imageUrl,
-      description: product.description,
-      caloriesPerServing: product.nutrition?.calories,
-    };
-  } catch (error) {
-    console.error('Error searching Kroger products by UPC:', error);
+    return cachedToken.accessToken;
+  } catch {
     return null;
   }
 }
 
-/**
- * Search for a product by name on Kroger's API.
- * Useful for finding products when UPC is not available.
- */
-export async function searchKrogerProductByName(
-  productName: string,
-  limit = 1,
-): Promise<KrogerProduct[]> {
+async function fetchProducts(path: string): Promise<KrogerApiProduct[]> {
   const token = await getKrogerAccessToken();
   if (!token) return [];
-
   try {
-    const response = await fetch(
-      `${KROGER_BASE_URL}/products?filter.term=${encodeURIComponent(productName)}&filter.limit=${limit}`,
-      {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Accept': 'application/json',
-        },
-      },
-    );
-
-    if (!response.ok) {
-      console.error('Kroger product search by name failed:', response.statusText);
-      return [];
-    }
-
-    const data = (await response.json()) as {
-      data?: Array<{
-        productId: string;
-        upc: string;
-        name: string;
-        brand?: string;
-        description?: string;
-        images?: KrogerApiImage[];
-        nutrition?: {
-          servingSize?: {
-            amount: number;
-            unit: string;
-          };
-          calories?: number;
-        };
-      }>;
-    };
-
-    if (!data.data) {
-      return [];
-    }
-
-    return data.data.map((product) => ({
-      productId: product.productId,
-      upc: product.upc,
-      name: product.name,
-      brand: product.brand,
-      imageUrl: getKrogerImageUrl(product.images),
-      description: product.description,
-      caloriesPerServing: product.nutrition?.calories,
-    }));
-  } catch (error) {
-    console.error('Error searching Kroger products by name:', error);
+    const response = await fetch(`${KROGER_BASE_URL}${path}`, {
+      headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+      signal: requestSignal(),
+    });
+    if (!response.ok) return [];
+    const data = (await response.json()) as { data?: unknown };
+    return Array.isArray(data.data) ? (data.data as KrogerApiProduct[]) : [];
+  } catch {
     return [];
   }
 }
 
 /**
- * Get the primary image URL for a Kroger product by product ID.
- * Useful if you already have the product ID and just need the image.
+ * Exact UPC lookup. Kroger can return multiple products even with filter.upc, so
+ * the product's returned UPC is checked before any image/product data is exposed.
  */
+export async function searchKrogerProductByUPC(upcInput: string): Promise<KrogerProduct | null> {
+  const upc = normalizeUpc(upcInput);
+  if (!upc) return null;
+  const products = await fetchProducts(`/products?filter.upc=${encodeURIComponent(upc)}`);
+  for (const raw of products) {
+    const product = toKrogerProduct(raw);
+    if (product && product.upc === upc) return product;
+  }
+  return null;
+}
+
+/**
+ * Search remains available for UI suggestion features, but consumers must apply
+ * `isExactKrogerNameMatch`; image enrichment intentionally does not use it.
+ */
+export async function searchKrogerProductByName(productName: string, limit = 5): Promise<KrogerProduct[]> {
+  const term = productName.trim().slice(0, 200);
+  if (!term) return [];
+  const boundedLimit = Math.max(1, Math.min(Math.floor(limit) || 1, 10));
+  const products = await fetchProducts(
+    `/products?filter.term=${encodeURIComponent(term)}&filter.limit=${boundedLimit}`,
+  );
+  return products.map(toKrogerProduct).filter((product): product is KrogerProduct => product !== null);
+}
+
+/** Conservative normalized equality; similarity is deliberately not a match. */
+export function normalizeKrogerProductName(value: string): string {
+  return value
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLocaleLowerCase('en-US')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .replace(/\s+/g, ' ');
+}
+
+export function isExactKrogerNameMatch(requestedName: string, product: Pick<KrogerProduct, 'name'>): boolean {
+  const requested = normalizeKrogerProductName(requestedName);
+  return Boolean(requested) && requested === normalizeKrogerProductName(product.name);
+}
+
+/** Get an image by the caller's exact Kroger product ID. */
 export async function getKrogerProductImage(productId: string): Promise<string | null> {
+  const id = productId.trim();
+  if (!/^[A-Za-z0-9._-]{1,128}$/.test(id)) return null;
   const token = await getKrogerAccessToken();
   if (!token) return null;
-
   try {
-    const response = await fetch(`${KROGER_BASE_URL}/products/${productId}`, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Accept': 'application/json',
-      },
+    const response = await fetch(`${KROGER_BASE_URL}/products/${encodeURIComponent(id)}`, {
+      headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+      signal: requestSignal(),
     });
-
-    if (!response.ok) {
-      return null;
-    }
-
-    const data = (await response.json()) as {
-      data?: {
-        images?: KrogerApiImage[];
-      };
-    };
-
-    const imageUrl = getKrogerImageUrl(data.data?.images);
-    return imageUrl || null;
-  } catch (error) {
-    console.error('Error fetching Kroger product image:', error);
+    if (!response.ok) return null;
+    const data = (await response.json()) as { data?: { images?: KrogerApiImage[] } };
+    return getKrogerImageUrl(data.data?.images) ?? null;
+  } catch {
     return null;
   }
 }
 
 /**
- * Enrich catalog foods with Kroger product images based on their barcodes.
- * Updates food objects in-place with Kroger images where available, preserving fallbacks.
- * Non-blocking: runs in background and silently fails over to existing images.
+ * Legacy utility retained for callers that explicitly request exact UPC enrichment.
+ * It never performs name matching and only writes URLs returned for the same UPC.
  */
 export async function enrichFoodsWithKrogerImages(
-  foods: Array<{ barcode?: string; imageUrl?: string }>,
+  foods: Array<{ barcode?: string; upc?: string; imageUrl?: string }>,
 ): Promise<void> {
-  if (!KROGER_CLIENT_ID || !KROGER_CLIENT_SECRET) {
-    return; // Skip silently if credentials not configured
-  }
-
   for (const food of foods) {
-    if (!food.barcode) continue;
-
-    try {
-      const krogerProduct = await searchKrogerProductByUPC(food.barcode);
-      if (krogerProduct?.imageUrl) {
-        food.imageUrl = krogerProduct.imageUrl;
-      }
-    } catch {
-      // Silently skip on error, keep existing fallback image
-    }
+    const upc = normalizeUpc(food.upc) ?? normalizeUpc(food.barcode);
+    if (!upc) continue;
+    const product = await searchKrogerProductByUPC(upc);
+    if (product?.imageUrl) food.imageUrl = product.imageUrl;
   }
 }

@@ -1,34 +1,31 @@
 /**
- * Tiered food image resolver (server-only).
+ * Server-only, identity-preserving food image resolver.
  *
- * Resolution order, first hit wins:
- *   1. Store CDN     — an explicit `storeImageUrl`, or a live Kroger product lookup.
- *   2. UPC match     — Open Food Facts, when the item carries a barcode.
- *   3. Generic       — Spoonacular ingredient art, then Unsplash photography.
- *   4. Portion guide — the macro-accurate hand-portion graphic for the item.
- *   5. Local         — a static placeholder bundled with the app.
- *
- * Every tier is failure-tolerant: a network error, missing API key, or empty
- * result silently demotes to the next tier rather than throwing.
+ * The resolver deliberately does not use first-result generic image searches. A
+ * photo is returned only when it is curated locally or tied to an exact store
+ * product/UPC; otherwise the component receives an honestly labelled guide or
+ * placeholder fallback.
  */
 
+import { getCuratedFoodPhoto } from './foodPhotos';
 import { getFallbackForPortionGuide } from './imageFallback';
 import { sanitizeRemoteUrl } from './imageHosts';
-import { searchKrogerProductByName, searchKrogerProductByUPC } from './krogerApi';
+import { getKrogerProductImage, searchKrogerProductByUPC } from './krogerApi';
 import {
   LOCAL_PLACEHOLDER_IMAGE,
+  normalizeUpc,
   type FoodItem,
   type ImageSource,
   type ResolvedFoodImage,
 } from '@/types/foodImage';
 
-const SPOONACULAR_API_KEY = process.env.SPOONACULAR_API_KEY ?? '';
-const UNSPLASH_ACCESS_KEY = process.env.UNSPLASH_ACCESS_KEY ?? '';
-
-const FETCH_TIMEOUT_MS = 4000;
+const FETCH_TIMEOUT_MS = 4_000;
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+const MAX_CACHE_ENTRIES = 200;
+const MAX_CONCURRENT_RESOLUTIONS = 4;
 
-const cache = new Map<string, { value: ResolvedFoodImage; expiresAt: number }>();
+type CacheEntry = { value: Omit<ResolvedFoodImage, 'id'>; expiresAt: number };
+const cache = new Map<string, CacheEntry>();
 
 async function fetchJson(url: string): Promise<unknown | null> {
   try {
@@ -44,119 +41,144 @@ async function fetchJson(url: string): Promise<unknown | null> {
   }
 }
 
-/** Tier 1 — retailer CDN. */
+/** Exact tier 0 — a parent-curated local photograph for a known seed food. */
+function resolveCurated(item: FoodItem): string | undefined {
+  return sanitizeRemoteUrl(getCuratedFoodPhoto(item));
+}
+
+/** Exact tier 1 — explicit direct URL, then Kroger product ID, then verified UPC. */
 async function resolveFromStore(item: FoodItem): Promise<string | undefined> {
   const direct = sanitizeRemoteUrl(item.storeImageUrl);
   if (direct) return direct;
 
   if (item.store !== 'kroger') return undefined;
 
-  const byUpc = item.upc ? await searchKrogerProductByUPC(item.upc) : null;
-  const fromUpc = sanitizeRemoteUrl(byUpc?.imageUrl);
-  if (fromUpc) return fromUpc;
+  if (item.storeProductId) {
+    const fromProductId = sanitizeRemoteUrl(await getKrogerProductImage(item.storeProductId));
+    if (fromProductId) return fromProductId;
+  }
 
-  const [byName] = await searchKrogerProductByName(item.name, 1);
-  return sanitizeRemoteUrl(byName?.imageUrl);
+  const upc = normalizeUpc(item.upc) ?? normalizeUpc(item.barcode);
+  if (!upc) return undefined;
+  const product = await searchKrogerProductByUPC(upc);
+  // Defense in depth: adapter validates this too, but never accept a product whose
+  // returned UPC differs from the requested identity.
+  if (!product || product.upc !== upc) return undefined;
+  return sanitizeRemoteUrl(product.imageUrl);
 }
 
-/** Tier 2 — Open Food Facts UPC match. */
+/** Exact tier 2 — Open Food Facts response must echo the requested UPC. */
 async function resolveFromOpenFoodFacts(item: FoodItem): Promise<string | undefined> {
-  const upc = item.upc?.trim();
-  if (!upc || !/^\d{6,14}$/.test(upc)) return undefined;
+  const upc = normalizeUpc(item.upc) ?? normalizeUpc(item.barcode);
+  if (!upc) return undefined;
 
-  const data = await fetchJson(`https://world.openfoodfacts.org/api/v0/product/${upc}.json`);
-  const payload = data as { status?: number; product?: Record<string, unknown> } | null;
+  const data = await fetchJson(`https://world.openfoodfacts.org/api/v0/product/${encodeURIComponent(upc)}.json`);
+  const payload = data as { status?: unknown; product?: Record<string, unknown> } | null;
   if (!payload || payload.status !== 1 || !payload.product) return undefined;
 
-  const product = payload.product;
+  const productUpc = normalizeUpc(payload.product.code) ?? normalizeUpc(payload.product._id);
+  if (productUpc !== upc) return undefined;
   return (
-    sanitizeRemoteUrl(product.image_front_url) ??
-    sanitizeRemoteUrl(product.image_url) ??
-    sanitizeRemoteUrl(product.image_front_small_url)
+    sanitizeRemoteUrl(payload.product.image_front_url) ??
+    sanitizeRemoteUrl(payload.product.image_url) ??
+    sanitizeRemoteUrl(payload.product.image_front_small_url)
   );
 }
 
-/** Tier 3a — Spoonacular canonical ingredient art. */
-async function resolveFromSpoonacular(query: string): Promise<string | undefined> {
-  if (!SPOONACULAR_API_KEY) return undefined;
-
-  const data = await fetchJson(
-    `https://api.spoonacular.com/food/ingredients/search?query=${encodeURIComponent(query)}&number=1&apiKey=${encodeURIComponent(SPOONACULAR_API_KEY)}`,
-  );
-  const results = (data as { results?: Array<{ image?: string }> } | null)?.results;
-  const image = results?.[0]?.image;
-  if (!image) return undefined;
-
-  return sanitizeRemoteUrl(`https://img.spoonacular.com/ingredients_500x500/${image}`);
+/**
+ * Cache identity intentionally includes every exact or semantic discriminator.
+ * This prevents same-name foods with distinct store URLs/product IDs/guides from
+ * ever sharing a previous item's resolved photo.
+ */
+export function foodImageCacheKey(item: FoodItem): string {
+  return JSON.stringify({
+    id: item.id,
+    name: item.name.trim().toLocaleLowerCase('en-US'),
+    query: (item.ingredientQuery ?? '').trim().toLocaleLowerCase('en-US'),
+    upc: normalizeUpc(item.upc) ?? normalizeUpc(item.barcode) ?? '',
+    store: item.store ?? '',
+    storeProductId: item.storeProductId ?? '',
+    directUrl: sanitizeRemoteUrl(item.storeImageUrl) ?? '',
+    portionGuide: item.portionGuide ?? '',
+  });
 }
 
-/** Tier 3b — Unsplash photography. */
-async function resolveFromUnsplash(query: string): Promise<string | undefined> {
-  if (!UNSPLASH_ACCESS_KEY) return undefined;
-
-  const data = await fetchJson(
-    `https://api.unsplash.com/search/photos?per_page=1&content_filter=high&orientation=squarish&query=${encodeURIComponent(`${query} food`)}&client_id=${encodeURIComponent(UNSPLASH_ACCESS_KEY)}`,
-  );
-  const results = (data as { results?: Array<{ urls?: { regular?: string } }> } | null)?.results;
-  return sanitizeRemoteUrl(results?.[0]?.urls?.regular);
+function readCache(key: string, itemId: string): ResolvedFoodImage | undefined {
+  const entry = cache.get(key);
+  if (!entry) return undefined;
+  if (entry.expiresAt <= Date.now()) {
+    cache.delete(key);
+    return undefined;
+  }
+  // Map insertion order is our LRU order.
+  cache.delete(key);
+  cache.set(key, entry);
+  return { id: itemId, ...entry.value };
 }
 
-function cacheKey(item: FoodItem): string {
-  return [item.store ?? '', item.upc ?? '', item.ingredientQuery ?? item.name].join('|').toLowerCase();
+function writeCache(key: string, resolved: ResolvedFoodImage): void {
+  cache.delete(key);
+  cache.set(key, {
+    value: { url: resolved.url, source: resolved.source },
+    expiresAt: Date.now() + CACHE_TTL_MS,
+  });
+  while (cache.size > MAX_CACHE_ENTRIES) cache.delete(cache.keys().next().value as string);
 }
 
-/** Sources that represent a real photo of the food, as opposed to a stand-in graphic. */
+/** Sources that are verified food photographs rather than local fallbacks. */
 const REAL_PHOTO_SOURCES: ReadonlySet<ImageSource> = new Set<ImageSource>([
+  'curated',
   'store',
   'open_food_facts',
-  'spoonacular',
-  'unsplash',
 ]);
 
-/** Resolve a single item through the full hierarchy. Never throws. */
+/** Resolve one item through curated and exact-identity tiers. Never throws. */
 export async function resolveFoodImage(item: FoodItem): Promise<ResolvedFoodImage> {
-  const key = cacheKey(item);
-  const cached = cache.get(key);
-  if (cached && cached.expiresAt > Date.now()) return { ...cached.value, id: item.id };
+  const key = foodImageCacheKey(item);
+  const cached = readCache(key, item.id);
+  if (cached) return cached;
 
-  const query = (item.ingredientQuery ?? item.name).trim();
   const tiers: Array<[ImageSource, () => Promise<string | undefined>]> = [
     ['store', () => resolveFromStore(item)],
     ['open_food_facts', () => resolveFromOpenFoodFacts(item)],
-    ['spoonacular', () => resolveFromSpoonacular(query)],
-    ['unsplash', () => resolveFromUnsplash(query)],
+    ['curated', async () => resolveCurated(item)],
     ['portion_guide', async () => getFallbackForPortionGuide(item.portionGuide)],
   ];
 
-  let resolved: ResolvedFoodImage = {
-    id: item.id,
-    url: LOCAL_PLACEHOLDER_IMAGE,
-    source: 'placeholder',
-  };
-
+  let resolved: ResolvedFoodImage = { id: item.id, url: LOCAL_PLACEHOLDER_IMAGE, source: 'placeholder' };
   for (const [source, run] of tiers) {
-    let url: string | undefined;
     try {
-      url = await run();
+      const url = await run();
+      if (url) {
+        resolved = { id: item.id, url, source };
+        break;
+      }
     } catch {
-      url = undefined;
-    }
-    if (url) {
-      resolved = { id: item.id, url, source };
-      break;
+      // Optional provider failures intentionally continue to the honest fallback.
     }
   }
 
-  // Only cache real photos so a transient outage doesn't pin a stand-in graphic for a day.
-  if (REAL_PHOTO_SOURCES.has(resolved.source)) {
-    cache.set(key, { value: resolved, expiresAt: Date.now() + CACHE_TTL_MS });
-  }
-
+  if (REAL_PHOTO_SOURCES.has(resolved.source)) writeCache(key, resolved);
   return resolved;
 }
 
-/** Resolve many items concurrently, keyed by `FoodItem.id`. */
+/** Resolve many cards with a small fixed worker pool rather than unbounded fan-out. */
 export async function resolveFoodImages(items: FoodItem[]): Promise<Record<string, ResolvedFoodImage>> {
-  const results = await Promise.all(items.map((item) => resolveFoodImage(item)));
-  return Object.fromEntries(results.map((result) => [result.id, result]));
+  const results: Record<string, ResolvedFoodImage> = {};
+  let cursor = 0;
+  const workerCount = Math.min(MAX_CONCURRENT_RESOLUTIONS, items.length);
+  await Promise.all(
+    Array.from({ length: workerCount }, async () => {
+      while (cursor < items.length) {
+        const item = items[cursor++];
+        results[item.id] = await resolveFoodImage(item);
+      }
+    }),
+  );
+  return results;
+}
+
+/** Test-only cache reset; not used by application code. */
+export function clearFoodImageCacheForTests(): void {
+  cache.clear();
 }

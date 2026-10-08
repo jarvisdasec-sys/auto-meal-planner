@@ -1,6 +1,7 @@
 import { filterFoodsForProfile, filterSnacksByCravings } from './fitnessMealPlanner';
-import type { MealWindow, UserProfile } from './fitnessMealPlanner';
+import type { FoodItem, MealWindow, StoreName, UserProfile } from './fitnessMealPlanner';
 import type { CatalogFoodItem, FoodCategory } from './foodCatalog';
+import { addDays, compareDateKeys, isDateKey, localDateKey, type DateKey } from './dateKeys';
 
 // ============================================================
 // SHARED MEAL-WINDOW GROUPING (dietary-filtered recommendations)
@@ -43,6 +44,8 @@ export interface WeeklyMealSlot {
   day: number; // 1-7
   mealWindow: MealWindow;
   food: CatalogFoodItem;
+  /** Planned portions for this slot. Legacy callers may omit it and get one portion. */
+  servings?: number;
 }
 
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -68,7 +71,7 @@ export function generateWeeklyMealPlan(
     if (list.length === 0) continue;
     for (let day = 1; day <= days; day++) {
       const index = day >= 2 && day <= 4 ? 0 : (day - 1) % list.length;
-      slots.push({ day, mealWindow: window, food: list[index] });
+      slots.push({ day, mealWindow: window, food: list[index], servings: 1 });
     }
   }
   return slots;
@@ -82,35 +85,63 @@ export interface PantryEntry {
   category: FoodCategory;
   daysUsed: number[];
   status: PantryStatus;
+  plannedPortions: number;
+  onHandPortions: number;
+  toBuyPortions: number;
+  /** Only populated from an actual user-entered inventory date. */
+  expiresOn?: DateKey;
+  expiryKnown: boolean;
 }
 
-// Vegetables and fresh fats (avocado, etc.) spoil quickly once opened/prepped
-const PERISHABLE_CATEGORIES: FoodCategory[] = ['vegetable', 'fat'];
+export interface PantryStockEntry {
+  portions: number;
+  expiresOn?: DateKey;
+}
 
-/** Tally how many times each food is used across the week and flag perishable carry-over items. */
-export function computePantryInventory(slots: WeeklyMealSlot[]): PantryEntry[] {
+export type PantryStock = Record<string, PantryStockEntry>;
+
+/**
+ * Tally planned portions and subtract only explicitly entered pantry stock. Reuse
+ * across days is useful prep information, not evidence an item is in the pantry
+ * or expiring. An expiring label requires an actual stored expiry date.
+ */
+export function computePantryInventory(slots: WeeklyMealSlot[], pantryStock: PantryStock = {}, today: DateKey = localDateKey()): PantryEntry[] {
   const map = new Map<string, PantryEntry>();
   for (const slot of slots) {
     const existing = map.get(slot.food.id);
+    const servings = typeof slot.servings === 'number' && Number.isFinite(slot.servings) && slot.servings > 0 ? slot.servings : 1;
     if (existing) {
       existing.daysUsed.push(slot.day);
+      existing.plannedPortions += servings;
     } else {
+      const stock = pantryStock[slot.food.id];
+      const onHandPortions = typeof stock?.portions === 'number' && Number.isFinite(stock.portions) && stock.portions > 0 ? stock.portions : 0;
+      const expiresOn = isDateKey(stock?.expiresOn) ? stock.expiresOn : undefined;
       map.set(slot.food.id, {
         foodId: slot.food.id,
         name: slot.food.name,
         category: slot.food.category,
         daysUsed: [slot.day],
         status: 'to_buy',
+        plannedPortions: servings,
+        onHandPortions,
+        toBuyPortions: Math.max(0, servings - onHandPortions),
+        expiresOn,
+        expiryKnown: Boolean(expiresOn),
       });
     }
   }
 
   const entries = Array.from(map.values());
   for (const entry of entries) {
-    const usedMultipleDays = entry.daysUsed.length > 1;
-    if (usedMultipleDays && PERISHABLE_CATEGORIES.includes(entry.category)) {
+    entry.toBuyPortions = Math.max(0, entry.plannedPortions - entry.onHandPortions);
+    const isRecordedNearExpiry = entry.expiresOn
+      && compareDateKeys(entry.expiresOn, today) >= 0
+      && compareDateKeys(entry.expiresOn, addDays(today, 3)) <= 0 ? true : false;
+    // This label is based only on the recorded date, never category or repeat use.
+    if (entry.onHandPortions > 0 && isRecordedNearExpiry) {
       entry.status = 'in_pantry_expiring';
-    } else if (usedMultipleDays) {
+    } else if (entry.onHandPortions > 0) {
       entry.status = 'in_pantry_stable';
     }
   }
@@ -131,8 +162,72 @@ export function generateUseWhatIHaveSuggestion(pantry: PantryEntry[]): UseWhatIH
   return {
     title: `Use-It-Up Bowl: ${expiring.map((entry) => entry.name).join(' + ')}`,
     ingredients: expiring.map((entry) => entry.name),
-    note: 'Combine these expiring items into a quick stir-fry, salad, or side dish before they spoil.',
+    note: 'These items have a recorded expiry date today; consider using them in a quick stir-fry, salad, or side dish.',
   };
+}
+
+export interface GroceryRequirement {
+  foodId: string;
+  name: string;
+  category: FoodCategory;
+  portionLabel: string;
+  plannedPortions: number;
+  onHandPortions: number;
+  toBuyPortions: number;
+  expiresOn?: DateKey;
+}
+
+/** Aggregate the authoritative plan by id and its actual selected serving counts. */
+export function getGroceryRequirements(slots: WeeklyMealSlot[], pantryStock: PantryStock = {}): GroceryRequirement[] {
+  return computePantryInventory(slots, pantryStock).map((entry) => {
+    const food = slots.find((slot) => slot.food.id === entry.foodId)?.food;
+    return {
+      foodId: entry.foodId,
+      name: entry.name,
+      category: entry.category,
+      portionLabel: food?.portionCooked ?? 'portion',
+      plannedPortions: entry.plannedPortions,
+      onHandPortions: entry.onHandPortions,
+      toBuyPortions: entry.toBuyPortions,
+      expiresOn: entry.expiresOn,
+    };
+  });
+}
+
+export interface PlanGroceryCost {
+  store: StoreName;
+  subtotal: number;
+  /** true when at least one required item lacks a usable price, so totals are partial. */
+  hasUnknownPrices: boolean;
+  unknownPriceFoodIds: string[];
+}
+
+function knownPriceForStore(food: FoodItem, store: StoreName): number | undefined {
+  const explicit = food.knownPrices?.[store];
+  if (typeof explicit === 'number' && Number.isFinite(explicit) && explicit >= 0) return explicit;
+  if (food.priceAvailability?.[store] === false) return undefined;
+  const estimated = food.estimatedPrices?.[store];
+  const allEstimatedPricesAreZero = Object.values(food.estimatedPrices ?? {}).every((price) => price === 0);
+  if (typeof estimated !== 'number' || !Number.isFinite(estimated) || estimated < 0 || (estimated === 0 && allEstimatedPricesAreZero)) return undefined;
+  return estimated;
+}
+
+/** Price only the plan requirements that remain to buy; unavailable data makes a partial total, never a free item. */
+export function estimatePlanGroceryCost(
+  requirements: GroceryRequirement[],
+  catalog: readonly FoodItem[],
+  store: StoreName,
+): PlanGroceryCost {
+  let subtotal = 0;
+  const unknownPriceFoodIds: string[] = [];
+  for (const requirement of requirements) {
+    if (requirement.toBuyPortions <= 0) continue;
+    const food = catalog.find((item) => item.id === requirement.foodId);
+    const price = food ? knownPriceForStore(food, store) : undefined;
+    if (price === undefined) unknownPriceFoodIds.push(requirement.foodId);
+    else subtotal += price * requirement.toBuyPortions;
+  }
+  return { store, subtotal, hasUnknownPrices: unknownPriceFoodIds.length > 0, unknownPriceFoodIds };
 }
 
 // ============================================================

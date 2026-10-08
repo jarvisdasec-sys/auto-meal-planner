@@ -1,0 +1,222 @@
+{
+  "failures": [],
+  "items": [
+    {
+      "brand": "StarKist",
+      "id": "nut-tuna-canned",
+      "image_verified": true,
+      "label_facts": {
+        "allergens": [
+          "Fish (tuna)"
+        ],
+        "calories": 90,
+        "carbGrams": 0,
+        "fatGrams": 0.5,
+        "proteinGrams": 20,
+        "serving_description": "1 can drained (113g), 5 oz listing"
+      },
+      "label_verified": false,
+      "matched_product": "StarKist Chunk Light Tuna in Water (Can)",
+      "name": "StarKist Canned Tuna in Water",
+      "notes": [
+        "Selected the official StarKist Chunk Light Tuna in Water can image; visual inspection confirms StarKist branding, tuna can, and IN WATER labeling.",
+        "The official product page lists 3 oz, 5 oz, and 12 oz can sizes, while the selected image does not make the can size unambiguous; label_verified is therefore false. The nutrition values recorded are the official page's 5 oz listing and should not be treated as verification of the original seed nutrition.",
+        "Image asset was downloaded unchanged as the local source archive.webp and transferred via the temporary CDN URL; no crop or style edit was applied."
+      ],
+      "source_page_url": "https://starkist.com/product/chunk-light-tuna-in-water-can/"
+    },
+    {
+      "brand": "Horizon Organic",
+      "id": "nut-whole-milk",
+      "image_verified": true,
+      "label_facts": {
+        "allergens": [
+          "Milk"
+        ],
+        "calories": 160,
+        "carbGrams": 13,
+        "fatGrams": 8,
+        "proteinGrams": 8,
+        "serving_description": "1 cup (240 mL)"
+      },
+      "label_verified": true,
+      "matched_product": "Horizon Organic Whole Milk, 1 gallon jug (High Vitamin D; Ultra-Pasteurized)",
+      "name": "Horizon Organic Whole Milk",
+      "notes": [
+        "Visually inspected the full 600x600 retailer image: it clearly shows the Horizon Organic branding, Organic Whole Milk, High Vitamin D, 1 gallon, and Ultra-Pasteurized wording; it is a genuine product packshot rather than a generic or AI image.",
+        "The selected image is from a public Lowes Foods retailer listing; the official Horizon product page is retained as the identity source. Original image was copied to the local source archive.jpg and uploaded without cropping or styling edits.",
+        "Official Horizon page provides unambiguous nutrition for Organic whole milk: 1 cup (240 mL), 160 calories, 8g fat, 13g carbohydrate, 8g protein, and contains milk. These facts are from the official label information, not inferred from the photograph.",
+        "Packaging and nutrition can vary by size, market, or formulation; the photographed jug's High Vitamin D wording is the closest explicit match to the requested unspecific Horizon Organic Whole Milk record."
+      ],
+      "source_page_url": "https://horizon.com/organic-dairy-products/organic-milk/organic-whole-milk/"
+    },
+    {
+      "brand": "Quest",
+      "id": "nut-protein-bar",
+      "image_source_url": "https://www.questnutrition.com/cdn/shop/files/qst-003853-chocolate-chip-cookie-dough-protein-bars_2_1800x1800.jpg?v=1773844149",
+      "image_verified": true,
+      "label_facts": {
+        "allergens": [
+          "milk",
+          "almonds",
+          "soy"
+        ],
+        "calories": 190,
+        "carbGrams": 22,
+        "fatGrams": 9,
+        "proteinGrams": 21,
+        "serving_description": "1 bar (60 g)"
+      },
+      "label_verified": true,
+      "matched_product": "Quest Chocolate Chip Cookie Dough Flavored Protein Bar (4-count box, 60 g bar)",
+      "name": "Quest Chocolate Chip Protein Bar",
+      "notes": [
+        "The requested record name is ambiguous; the official Quest product page matching the chocolate-chip identity is Chocolate Chip Cookie Dough, not Oatmeal Chocolate Chip or another flavor.",
+        "Official page label states 1 bar (60 g), 190 calories, 21 g protein, 22 g total carbohydrate, and 9 g fat; label facts are verified for this exact selected product.",
+        "Official allergen statement says contains milk, almonds, and soy; processed on equipment that also processes peanuts and other tree nuts.",
+        "Selected image is the original official Quest product image, visually inspected at 1800x1800; it clearly shows Quest Chocolate Chip Cookie Dough packaging and wrapper. No crop or style edit was made."
+      ],
+      "source_page_url": "https://www.questnutrition.com/products/chocolate-chip-cookie-dough-protein-bar"
+    },
+    {
+      "brand": "McDonald's",
+      "id": "nut-mcdonalds-fries",
+      "image_verified": true,
+      "label_facts": {
+        "allergens": [
+          "wheat",
+          "milk"
+        ],
+        "calories": 320,
+        "carbGrams": 43,
+        "fatGrams": 15,
+        "proteinGrams": 5,
+        "serving_description": "1 medium serving of World Famous Fries\u00ae (official page identifies the medium item; gram weight not stated)"
+      },
+      "label_verified": true,
+      "matched_product": "McDonald's USA World Famous Fries\u00ae (Medium)",
+      "name": "McDonalds USA Medium French Fries",
+      "notes": [
+        "Selected image was visually inspected at full resolution: it is a branded McDonald's red fries carton with the Golden Arches and fries, not generic food or stock imagery; original 600x600 RGBA image was preserved without crop or style edits at the local source archive.webp before upload.",
+        "The image-search result labels this visual as World Famous Fries (Small), while the official source page is the exact Medium product; portion-size packaging is not explicit in the image, so size correspondence remains an ambiguity even though the product family/brand is genuine.",
+        "Official McDonald's ingredient statement lists potatoes, vegetable oils, natural beef flavor with hydrolyzed wheat and hydrolyzed milk, dextrose, sodium acid pyrophosphate, and salt; it explicitly says Contains: Wheat, Milk.",
+        "Because the U.S. fries contain wheat and milk derivatives, they are not vegan. McDonald's official page also states it does not promote U.S. menu items as vegetarian, vegan, or gluten-free.",
+        "Nutrition and ingredients are from the official McDonald's USA medium-fries page; the page notes formulations and values can change and identifies the information as correct as of January 2022. A photo alone does not verify nutrition."
+      ],
+      "source_page_url": "https://www.mcdonalds.com/us/en-us/product/medium-french-fries.html"
+    },
+    {
+      "brand": "Optimum Nutrition",
+      "id": "sup-whey-protein",
+      "image_verified": true,
+      "label_facts": {
+        "allergens": [
+          "Milk",
+          "Soy"
+        ],
+        "calories": 100,
+        "carbGrams": 1,
+        "fatGrams": 0,
+        "proteinGrams": 25,
+        "serving_description": "1 scoop (30 g); 44 servings per container"
+      },
+      "label_verified": true,
+      "matched_product": "Optimum Nutrition Gold Standard 100% Isolate, Rich Vanilla, 2.91 lb (44 servings) whey protein isolate powder",
+      "name": "Optimum Nutrition Whey Protein Isolate",
+      "notes": [
+        "Selected Rich Vanilla because the generic record does not specify flavor; the official page also offers Chocolate Bliss, so flavor remains an ambiguity.",
+        "The selected full-size image was visually inspected: it clearly shows the Optimum Nutrition logo, Gold Standard 100% Isolate branding, Rich Vanilla flavor, 25 g protein, and 44 servings on the package.",
+        "Label facts are verified against the public GNC listing for the exact Rich Vanilla 44-serving item (item 352560), which links a nutrition label; the official brand page confirms the product identity and 25 g protein/0.5 g fat/1 g carbs claims.",
+        "Original image was preserved without edits or cropping; only the website parent should re-encode it. Copyright and branding remain visible."
+      ],
+      "source_page_url": "https://www.optimumnutrition.com/en-us/products/gold-standard-100-isolate-whey-protein-powder"
+    },
+    {
+      "brand": "MuscleTech",
+      "id": "sup-creatine",
+      "image_verified": true,
+      "label_facts": {
+        "serving_description": "1 scoop (5 g); approximately 90 servings on page vs 80 on pictured pack"
+      },
+      "label_verified": false,
+      "matched_product": "MuscleTech Platinum 100% Creatine, unflavored, current US 5 g product packaging",
+      "name": "MuscleTech Creatine Monohydrate",
+      "notes": [
+        "Official US image confirms MuscleTech, creatine monohydrate, unflavored and 5 g per serving.",
+        "Official page lists approximately 90 servings, but pictured 400 g package says 80; packaging count may vary.",
+        "Only the 5 g serving identity was verified; calories/macros were not inferred from the picture.",
+        "Replaced the earlier Australian 3 g package to match the seed\u2019s 5 g serving."
+      ],
+      "source_page_url": "https://www.muscletech.com/products/platinum-100-creatine",
+      "image_source_url": "https://cdn.shopify.com/s/files/1/1214/7132/files/MuscleTech-100Creatine-Unflavored-2000x2000-10_font.jpg?v=1766074513"
+    },
+    {
+      "brand": "Cellucor",
+      "id": "sup-pre-workout",
+      "image_source_url": "https://cellucor.com/cdn/shop/files/C4AN_1002_Brand_C4YellowLabel_Transition_C4Original_CoreFlavors_BasicPDPs-OG-IBR-Hero-Grey.png?v=1773235672&width=5000",
+      "image_verified": true,
+      "label_facts": {
+        "allergens": [],
+        "calories": 10,
+        "carbGrams": 1,
+        "fatGrams": 0,
+        "proteinGrams": 0,
+        "serving_description": "8.9 g (approximately 1 level scoop); 30 servings per container"
+      },
+      "label_verified": true,
+      "matched_product": "Cellucor C4 Original Pre-Workout, Icy Blue Razz, 30 servings (current 5th Gen formula)",
+      "name": "C4 Pre-Workout Energy Blend",
+      "notes": [
+        "The record does not specify a flavor or formula generation; I selected the closest explicitly matching product on the official Cellucor page, Icy Blue Razz C4 Original.",
+        "The full-resolution image was visually inspected: it clearly shows the genuine Cellucor C4 Original tub, Icy Blue Razz branding, pre-workout label, and 30 servings; no crop or style edits were made.",
+        "Nutrition facts were read from the official product page's matching Icy Blue Razz supplement-facts image. The displayed panel lists 10 calories and 1 g total carbohydrate per 8.9 g serving; protein and fat are not listed and are represented as 0 for the food-record fields. The visible other-ingredients statement lists no major allergen; this is not a guarantee for cross-contact."
+      ],
+      "source_page_url": "https://cellucor.com/products/c4-original"
+    },
+    {
+      "brand": "Scivation (XTEND)",
+      "id": "sup-bcaa",
+      "image_verified": true,
+      "label_facts": {
+        "allergens": [],
+        "serving_description": "Exact Blue Raspberry Ice label facts were not exposed unambiguously on the official product page; selected product is 30 servings."
+      },
+      "label_verified": false,
+      "matched_product": "XTEND Original BCAA Powder, Blue Raspberry Ice, 30 Servings",
+      "name": "Scivation Xtend BCAA Recovery Powder",
+      "notes": [
+        "Flavor was unspecified in the record; Blue Raspberry Ice is the closest explicitly matching XTEND Original BCAA identity found.",
+        "The selected image was downloaded and visually inspected: it clearly shows the XTEND Original 7g BCAA tub, Blue Raspberry Ice flavor, 30 servings, and preserves the original branding/disclaimer artwork without crop or style edits.",
+        "Official Cellucor product page confirms XTEND Original BCAA Powder identity, Blue Raspberry Ice option, and 30-serving size.",
+        "Label verification is false: public retailer facts found for a different flavor should not be assumed identical to the selected Blue Raspberry Ice product, and the image alone does not verify calories or macros."
+      ],
+      "source_page_url": "https://cellucor.com/products/xtend-original"
+    },
+    {
+      "brand": "Nordic Naturals",
+      "id": "sup-fish-oil",
+      "image_verified": true,
+      "label_facts": {
+        "allergens": [
+          "fish"
+        ],
+        "calories": 20,
+        "carbGrams": 0,
+        "fatGrams": 2,
+        "proteinGrams": 0,
+        "serving_description": "2 soft gels"
+      },
+      "label_verified": false,
+      "matched_product": "Nordic Naturals Omega-3 Lemon Soft Gels, 60 Count (690 mg total omega-3s per 2 soft gels)",
+      "name": "Omega-3 Fish Oil",
+      "notes": [
+        "Selected and visually inspected a genuine branded product image showing Nordic Naturals Omega-3, 690 mg total omega-3s, 60 soft gels; the image is not AI-generated, generic, or another product.",
+        "The official product page identifies the soft-gel serving as two soft gels and 690 mg total omega-3s; it defaults to the 60-count lemon variant.",
+        "Public retailer nutrition text reports 20 calories and 2 g total fat per serving; carbohydrate/protein are recorded as zero based on the product nutrition listing, but label_verified remains false because a complete, unambiguous Supplement Facts panel was not available in the fetched sources.",
+        "Fish allergen is inferred from the product being fish oil; exact allergen statement was not available in the fetched label source.",
+        "The generic record does not specify count or flavor; 60-count lemon soft gels are the closest explicitly matching official variant found. No claim is made that original seed nutrition is verified from the photo."
+      ],
+      "source_page_url": "https://www.nordic.com/products/omega-3/"
+    }
+  ]
+}

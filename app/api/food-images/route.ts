@@ -1,70 +1,56 @@
 import { NextResponse } from 'next/server';
 
 import { resolveFoodImages } from '@/lib/foodImageResolver';
-import { PORTION_GUIDE_FALLBACKS, type PortionGuideKey } from '@/lib/imageFallback';
-import { LOCAL_PLACEHOLDER_IMAGE, type FoodItem, type StoreId } from '@/types/foodImage';
+import { LOCAL_PLACEHOLDER_IMAGE, toFoodImageItem, type FoodImageItemInput, type FoodItem } from '@/types/foodImage';
 
 export const runtime = 'nodejs';
 
 const MAX_ITEMS = 25;
-const STORES: StoreId[] = ['walmart', 'kroger', 'other'];
-const PORTION_GUIDES = Object.keys(PORTION_GUIDE_FALLBACKS) as PortionGuideKey[];
 
-function toFoodItem(raw: unknown): FoodItem | null {
-  if (!raw || typeof raw !== 'object') return null;
-  const value = raw as Record<string, unknown>;
+function badRequest(message: string, status = 400) {
+  return NextResponse.json({ error: message, images: {} }, { status });
+}
 
-  const id = typeof value.id === 'string' ? value.id.slice(0, 128) : '';
-  const name = typeof value.name === 'string' ? value.name.trim().slice(0, 200) : '';
-  if (!id || !name) return null;
-
-  const store = STORES.find((candidate) => candidate === value.store);
-  const portionGuide = PORTION_GUIDES.find((candidate) => candidate === value.portionGuide);
-
-  return {
-    id,
-    name,
-    store,
-    portionGuide,
-    ingredientQuery:
-      typeof value.ingredientQuery === 'string' ? value.ingredientQuery.trim().slice(0, 200) : undefined,
-    upc: typeof value.upc === 'string' && /^\d{6,14}$/.test(value.upc.trim()) ? value.upc.trim() : undefined,
-    storeProductId: typeof value.storeProductId === 'string' ? value.storeProductId.slice(0, 64) : undefined,
-    storeImageUrl: typeof value.storeImageUrl === 'string' ? value.storeImageUrl.slice(0, 2048) : undefined,
-  };
+function parseItems(value: unknown): FoodItem[] | null {
+  if (!Array.isArray(value)) return null;
+  if (value.length > MAX_ITEMS) return null;
+  const items = value.map((raw) => toFoodImageItem(raw as FoodImageItemInput));
+  if (items.some((item) => !item)) return null;
+  const resolved = items as FoodItem[];
+  if (new Set(resolved.map((item) => item.id)).size !== resolved.length) return null;
+  return resolved;
 }
 
 /**
  * POST /api/food-images
- * Body: { items: FoodItem[] }
- * Returns: { images: Record<string, { url, source }> }
+ * Body: `{ items: FoodImageItemInput[] }`; `barcode` is accepted as a legacy UPC
+ * alias. Invalid, oversized, and duplicate batches are rejected before resolution.
  */
 export async function POST(request: Request) {
   let body: unknown;
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON body.' }, { status: 400 });
+    return badRequest('Invalid JSON body.');
   }
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return badRequest('Body must be an object.');
 
-  const rawItems = (body as { items?: unknown })?.items;
-  if (!Array.isArray(rawItems)) {
-    return NextResponse.json({ error: '`items` must be an array.' }, { status: 400 });
-  }
+  const rawItems = (body as { items?: unknown }).items;
+  if (!Array.isArray(rawItems)) return badRequest('`items` must be an array.');
+  if (rawItems.length > MAX_ITEMS) return badRequest(`At most ${MAX_ITEMS} items are allowed.`, 413);
 
-  const items = rawItems.slice(0, MAX_ITEMS).map(toFoodItem).filter((item): item is FoodItem => item !== null);
-  if (items.length === 0) {
-    return NextResponse.json({ images: {} });
-  }
+  const items = parseItems(rawItems);
+  if (!items) return badRequest('Items must be valid, unique food-image descriptors.');
+  if (items.length === 0) return NextResponse.json({ images: {} });
 
   try {
-    const images = await resolveFoodImages(items);
-    return NextResponse.json({ images });
+    return NextResponse.json({ images: await resolveFoodImages(items) });
   } catch {
-    // Never fail the UI over an image lookup — degrade to the local placeholder.
-    const images = Object.fromEntries(
-      items.map((item) => [item.id, { id: item.id, url: LOCAL_PLACEHOLDER_IMAGE, source: 'placeholder' }]),
-    );
-    return NextResponse.json({ images });
+    // A provider failure must not make an image endpoint fail the card request.
+    return NextResponse.json({
+      images: Object.fromEntries(
+        items.map((item) => [item.id, { id: item.id, url: LOCAL_PLACEHOLDER_IMAGE, source: 'placeholder' }]),
+      ),
+    });
   }
 }
