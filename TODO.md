@@ -8,4 +8,10 @@
 - [x] **Recipe builder:** create validated recipes with name, yield, per-serving calories/macros, ingredients, instructions, meal window and allergens; new recipes appear in existing Recipe Box and can use its existing logging/plan flows. Invalid values and exclusions have actionable states.
 - [x] **Backup/export and preservation:** export browser-local planner and workspace data, export dated food history CSV, preserve the existing storage key and records with guarded hydration. Clearly state that no cloud account sync is provided.
 - [x] **Complete verification:** run pure-logic, store and component regressions, TypeScript/lint/production checks, read-only integration review and focused usability verification; fix confirmed defects before review delivery.
-- [ ] **Review handoff:** save a tested GitHub PR and verify an accessible review preview. Present exact completed scope before production merge/publication and leave production unchanged pending approval.
+- [x] **Review handoff:** save a tested GitHub PR and verify an accessible review preview. Present exact completed scope before production merge/publication and leave production unchanged pending approval.
+
+Review PR: https://github.com/jarvisdasec-sys/auto-meal-planner/pull/2
+
+Verified temporary preview: https://3000-iycaq5ixkg1d3h08nphk8-f94320cc.us1.manus.computer
+
+Production merge/publication remains pending approval.
