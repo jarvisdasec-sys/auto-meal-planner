@@ -1,29 +1,19 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   darkMode: 'class',
-  content: [
-    './src/**/*.{js,ts,jsx,tsx,mdx}',
-    './app/**/*.{js,ts,jsx,tsx,mdx}',
-  ],
+  content: ['./src/**/*.{js,ts,jsx,tsx,mdx}', './app/**/*.{js,ts,jsx,tsx,mdx}'],
   theme: {
     extend: {
       colors: {
-        surface: {
-          DEFAULT: '#12141c',
-          card: '#1a1d29',
-          border: '#2a2e3e',
-        },
-        accent: {
-          DEFAULT: '#7c5cff',
-          green: '#3ddc97',
-          amber: '#ffb84d',
-          red: '#ff6b6b',
-        },
+        surface: { DEFAULT: '#080a08', card: '#111411', border: '#292e29' },
+        accent: { DEFAULT: '#8CFF00', green: '#8CFF00', amber: '#ffbf69', red: '#ff8080' },
       },
-      borderRadius: {
-        xl: '1rem',
-        '2xl': '1.25rem',
+      fontFamily: {
+        sans: ['Barlow', 'Arial', 'sans-serif'],
+        display: ['Oswald', 'Arial Narrow', 'Arial', 'sans-serif'],
+        mono: ['JetBrains Mono', 'Consolas', 'monospace'],
       },
+      borderRadius: { xl: '0.85rem', '2xl': '1rem' },
     },
   },
   plugins: [],

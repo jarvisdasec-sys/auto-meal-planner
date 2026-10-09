@@ -1,4 +1,4 @@
-# Auto Meal Planner
+# BTB Meal Planner
 
 The existing Next.js meal-planner dashboard, hosted at https://auto-meal-planner-pi.vercel.app/. This repository remains the site's actual GitHub/Vercel source; it has not been replaced with a separate prototype.
 
@@ -19,7 +19,7 @@ npm run start -- --hostname 0.0.0.0 --port 3000
 
 ## Application structure
 
-`src/components` contains the eight retained dashboard sections and their forms/modals. `src/store/useMealPlannerStore.ts` holds browser-local profile, plan, pantry, intake, exercise, hydration and recipe state, with client-effect hydration and safe storage operations. `src/lib` contains shared local-date, nutrition-snapshot, validation, dietary evaluation, weekly-plan and grocery helpers. `src/data/nutritionDatabase.ts` and `src/lib/foodCatalog.ts` are the stable seed sources. `app/api` provides bounded image-enrichment endpoints.
+`src/components` contains the BTB navigation shell, new Overview, seven-day planner, Meal Prep, household Shopping List, Recipe Builder and Backup/Settings, plus all retained dashboard tools and forms/modals. `src/store/useMealPlannerStore.ts` retains browser-local profile, plan, pantry, intake, exercise, hydration and recipe state; `useWorkspaceStore.ts` separately persists household/budget preferences and plan-scoped checklists. Both use guarded client hydration. `src/lib` contains shared local-date, nutrition-snapshot, validation, dietary evaluation, weekly-plan, prep, export and grocery helpers. `src/data/nutritionDatabase.ts` and `src/lib/foodCatalog.ts` are the stable seed sources. `app/api` provides bounded image-enrichment endpoints.
 
 Forty committed local food assets cover all 41 seed records, with broccoli shared. `src/lib/foodPhotos.ts` maps reserved seed IDs and approved generic aliases; unrelated products cannot inherit a branded package through a generic name. `public/images/foods/*-sources.json` records provenance; five portion-guide PNGs are separate approximate hand illustrations. `npm run generate:portion-guides` verifies these illustrations and does not recreate the previous geometric placeholders.
 
@@ -35,4 +35,6 @@ Personal data remains local to the user's browser when storage is available; no 
 
 See [the audit and repair summary](docs/audit-report.md) for confirmed defects, repairs, test evidence, image ambiguities and remaining development-only dependency advisories. Production dependencies report zero advisories at the reviewed revision; this does not mean all development tools are vulnerability-free.
 
-Changes are reviewed on the repair branch and published through the existing GitHub/Vercel production pipeline only after the owner's approval. A passing local build or PR preview is not a live publication. Keep any production merge tied to the approved PR head and verify the actual live domain afterward.
+See [the premium upgrade summary](docs/premium-upgrade.md) for the BTB identity, weekly/prep/shopping/recipe/backup features and limitations. The upgraded release has 95 passing tests, clean TypeScript/lint and a successful production build.
+
+Changes are reviewed on a feature branch and published through the existing GitHub/Vercel production pipeline only after the owner's approval. A passing local build or PR preview is not a live publication. Keep any production merge tied to the approved PR head and verify the actual live domain afterward.

@@ -2,13 +2,13 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Build The Body Meal Planner',
-  description: 'Track macros, meals, exercise, and grocery costs in one place.',
+  title: 'BTB Meal Planner',
+  description: 'Plan your week, batch-prep meals, track nutrition, and shop with purpose. A professional BTB nutrition workspace.',
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
-    title: 'BTB Planner',
+    title: 'BTB Meal Planner',
   },
   icons: {
     icon: '/icon.svg',
@@ -19,8 +19,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
-  maximumScale: 1,
-  themeColor: '#39ff14',
+  themeColor: '#8CFF00',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -30,9 +29,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <meta name="apple-mobile-web-app-title" content="BTB Planner" />
+        <meta name="apple-mobile-web-app-title" content="BTB Meal Planner" />
       </head>
-      <body className="min-h-screen bg-[#0b0c12] text-slate-100 antialiased">{children}</body>
+      <body className="min-h-screen bg-[#060806] text-slate-100 antialiased">{children}</body>
     </html>
   );
 }

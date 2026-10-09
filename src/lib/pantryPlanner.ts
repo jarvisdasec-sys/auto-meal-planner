@@ -77,7 +77,7 @@ export function generateWeeklyMealPlan(
   return slots;
 }
 
-export type PantryStatus = 'to_buy' | 'in_pantry_expiring' | 'in_pantry_stable';
+export type PantryStatus = 'to_buy' | 'in_pantry_expiring' | 'in_pantry_stable' | 'expired';
 
 export interface PantryEntry {
   foodId: string;
@@ -115,14 +115,15 @@ export function computePantryInventory(slots: WeeklyMealSlot[], pantryStock: Pan
       existing.plannedPortions += servings;
     } else {
       const stock = pantryStock[slot.food.id];
-      const onHandPortions = typeof stock?.portions === 'number' && Number.isFinite(stock.portions) && stock.portions > 0 ? stock.portions : 0;
       const expiresOn = isDateKey(stock?.expiresOn) ? stock.expiresOn : undefined;
+      const expired = Boolean(expiresOn && expiresOn < today);
+      const onHandPortions = !expired && typeof stock?.portions === 'number' && Number.isFinite(stock.portions) && stock.portions > 0 ? stock.portions : 0;
       map.set(slot.food.id, {
         foodId: slot.food.id,
         name: slot.food.name,
         category: slot.food.category,
         daysUsed: [slot.day],
-        status: 'to_buy',
+        status: expired ? 'expired' : 'to_buy',
         plannedPortions: servings,
         onHandPortions,
         toBuyPortions: Math.max(0, servings - onHandPortions),
@@ -162,7 +163,7 @@ export function generateUseWhatIHaveSuggestion(pantry: PantryEntry[]): UseWhatIH
   return {
     title: `Use-It-Up Bowl: ${expiring.map((entry) => entry.name).join(' + ')}`,
     ingredients: expiring.map((entry) => entry.name),
-    note: 'These items have a recorded expiry date today; consider using them in a quick stir-fry, salad, or side dish.',
+    note: 'These items have a recorded expiry date within the next three days; check their condition and labels before using them.',
   };
 }
 
@@ -247,15 +248,16 @@ export function aggregateBatchPrepList(slots: WeeklyMealSlot[]): BatchPrepItem[]
   const map = new Map<string, BatchPrepItem>();
   for (const slot of slots) {
     const existing = map.get(slot.food.id);
+    const servings = slot.servings ?? 1;
     if (existing) {
-      existing.timesPerWeek += 1;
+      existing.timesPerWeek += servings;
       existing.usage.push({ day: slot.day, mealWindow: slot.mealWindow });
     } else {
       map.set(slot.food.id, {
         foodId: slot.food.id,
         name: slot.food.name,
         portionCooked: slot.food.portionCooked,
-        timesPerWeek: 1,
+        timesPerWeek: servings,
         usage: [{ day: slot.day, mealWindow: slot.mealWindow }],
       });
     }
