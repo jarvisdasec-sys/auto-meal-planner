@@ -3,8 +3,10 @@
 import { useEffect, useState } from 'react';
 import { hydrateMealPlannerStore } from '@/store/useMealPlannerStore';
 import { hydrateWorkspaceStore, useWorkspaceStore } from '@/store/useWorkspaceStore';
+import { hydrateRecipeWeekStore, useRecipeWeekStore } from '@/store/useRecipeWeekStore';
 import PlannerOverview from './PlannerOverview';
 import WeeklyPlanner from './WeeklyPlanner';
+import RecipeWeekPlanner from './RecipeWeekPlanner';
 import MealPrepHub from './MealPrepHub';
 import ShoppingWorkspace from './ShoppingWorkspace';
 import WorkspaceSettings from './WorkspaceSettings';
@@ -20,7 +22,8 @@ import FoodLogger from './FoodLogger';
 
 const TABS = [
   { id: 'overview', label: 'Overview', title: 'Plan the week. Prep with purpose.', detail: 'Your meals, your progress, your next move—all in one BTB workspace.' },
-  { id: 'week', label: 'Weekly Planner', title: 'Your seven-day blueprint.', detail: 'Build, personalize, and keep the week in focus.' },
+  { id: 'recipeWeek', label: 'Recipe Week', title: 'Cook from a complete plan.', detail: 'Measured ingredients, real instructions, and practical kitchen workflow.' },
+  { id: 'week', label: 'Food Week', title: 'Your food-based seven-day blueprint.', detail: 'Build, personalize, and keep the individual-food plan in focus.' },
   { id: 'prep', label: 'Meal Prep', title: 'Own your kitchen routine.', detail: 'Batch prep, portion, label, and store with intention.' },
   { id: 'shopping', label: 'Shopping List', title: 'Shop only what your plan needs.', detail: 'Household quantities, pantry awareness, and budget clarity.' },
   { id: 'meals', label: 'Daily Meal Plan', title: 'Dial in the details.', detail: 'Cooking methods, portions, replacements, and logging.' },
@@ -34,19 +37,36 @@ const TABS = [
   { id: 'settings', label: 'Backup & Settings', title: 'Keep your workspace yours.', detail: 'Household preferences, data backup, and exports.' },
 ] as const;
 type TabId = (typeof TABS)[number]['id'];
+function isTabId(value: string | null): value is TabId { return Boolean(value && TABS.some((tab) => tab.id === value)); }
 
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState<TabId>('overview');
   const [showBuilder, setShowBuilder] = useState(false);
   const [ready, setReady] = useState(false);
-  const storageAvailable = useWorkspaceStore((s) => s.storageAvailable);
+  const workspaceStorageAvailable = useWorkspaceStore((s) => s.storageAvailable);
+  const recipeStorageAvailable = useRecipeWeekStore((s) => s.storageAvailable);
+  const storageAvailable = workspaceStorageAvailable && recipeStorageAvailable;
   const current = TABS.find((tab) => tab.id === activeTab)!;
   const navigate = (tab: TabId) => {
     setActiveTab(tab);
     setShowBuilder(false);
+    const url = new URL(window.location.href);
+    if (tab === 'recipeWeek') url.searchParams.set('view', 'recipeWeek');
+    else url.searchParams.delete('view');
+    window.history.replaceState(null, '', url);
     window.scrollTo({ top: 0, behavior: 'auto' });
   };
-  useEffect(() => { hydrateMealPlannerStore(); hydrateWorkspaceStore(); setReady(true); }, []);
+  useEffect(() => {
+    hydrateMealPlannerStore(); hydrateWorkspaceStore(); hydrateRecipeWeekStore();
+    const requested = new URLSearchParams(window.location.search).get('view');
+    if (isTabId(requested)) setActiveTab(requested);
+    else if (requested) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('view');
+      window.history.replaceState(null, '', url);
+    }
+    setReady(true);
+  }, []);
 
   return <div className="btb-shell lg:pl-60">
     <a href="#planner-content" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded focus:bg-accent focus:p-3 focus:text-black">Skip to planner content</a>
@@ -70,6 +90,7 @@ export default function Dashboard() {
         <main id="planner-content" tabIndex={-1}>
           {!ready ? <p role="status" className="text-sm text-slate-400">Loading your local workspace…</p> : <>
           {activeTab === 'overview' && <PlannerOverview navigate={navigate} />}
+          {activeTab === 'recipeWeek' && <RecipeWeekPlanner />}
           {activeTab === 'week' && <WeeklyPlanner onOpenDaily={() => navigate('meals')} onOpenPrep={() => navigate('prep')} />}
           {activeTab === 'prep' && <MealPrepHub onOpenPlan={() => navigate('week')} onOpenShopping={() => navigate('shopping')} />}
           {activeTab === 'shopping' && <ShoppingWorkspace onOpenPlan={() => navigate('week')} onOpenPantry={() => navigate('grocery')} />}

@@ -6,9 +6,10 @@ import { loadMyFoods } from '@/lib/myFoodsStorage';
 import { downloadText, toCsv, validateHouseholdSize } from '@/lib/premiumPlanner';
 import { useMealPlannerStore } from '@/store/useMealPlannerStore';
 import { useWorkspaceStore } from '@/store/useWorkspaceStore';
+import { useRecipeWeekStore } from '@/store/useRecipeWeekStore';
 import Card from './ui/Card';
 
-// This is the only auxiliary localStorage data used by the application. It contains user-created foods, not credentials.
+// Auxiliary user-created foods, not credentials. Recipe-week data is exported via an explicit whitelist.
 const MY_FOODS_STORAGE_KEY = 'btb-meal-planner:my-foods';
 
 /** Optional presentation hook for embedding Workspace Settings in a dashboard layout. */
@@ -84,6 +85,7 @@ export default function WorkspaceSettings({ className = '' }: WorkspaceSettingsP
     setExportError(null);
     try {
       // Explicit whitelist: this is persisted data only, never Zustand actions/functions or unrelated browser storage.
+      const recipeState = useRecipeWeekStore.getState();
       const backup = {
         format: 'btb-meal-planner-browser-backup',
         version: 1,
@@ -104,6 +106,12 @@ export default function WorkspaceSettings({ className = '' }: WorkspaceSettingsP
           weeklyBudget,
           prepSessions,
           purchased,
+        },
+        recipeWorkspace: {
+          plan: recipeState.plan, favorites: recipeState.favorites,
+          savedWeeks: recipeState.savedWeeks, lockedSlots: recipeState.lockedSlots,
+          purchased: recipeState.purchased, prepCompleted: recipeState.prepCompleted,
+          householdSize: recipeState.householdSize,
         },
         auxiliaryLocalStorage: {
           [MY_FOODS_STORAGE_KEY]: loadMyFoods(),

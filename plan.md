@@ -35,3 +35,9 @@ Add Backup & Export with browser-local data export and CSV history export. State
 
 ## Publication boundary
 Create a tested pull request and review preview through the existing repository, without silently merging or publishing to production. Present the exact completed scope for approval before triggering the existing Vercel production deployment. Do not confuse preview verification with a live update.
+
+# Complete-recipe client-growth review — new phase
+
+Branch feat/btb-client-growth from published origin/main. Preserve prior tools and states. New src/lib/recipeMeals.ts: complete quantified recipe catalog, generation/ingredient nutrition/shopping. New src/store/useRecipeWeekStore.ts: separately persisted validated recipe-week/favorites/saved weeks/locks. New src/components/RecipeWeekPlanner.tsx: guided filters, dates/day selection, ingredient instructions, swaps/locks/regeneration, named save/load, household shopping/prep/printing, explicit dated consumption logging. Integrate in Dashboard/Overview with ?view=recipeWeek deep link. Existing individual-food weekly planner remains clearly accessible.
+
+Design: same #8CFF00 black/charcoal, Oswald/Barlow/JetBrains Mono; asymmetric featured meals using existing images, approachable onboarding and day tabs, mobile/keyboard support. Quantities must drive all nutrition/shopping/prep/log snapshots; disclosed reference estimates, no dietitian review/live store prices claim. Respect profile exclusions/allergens/GI safeguards on generate/swap/load; empty constraint result explicit. New records browser-local; no paid billing/cloud/AI functionality promised. Existing 95-test baseline. No active Manus diagnostics binding; npm check/lint fallback. PR review only, no publication.

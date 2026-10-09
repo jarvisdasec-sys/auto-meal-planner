@@ -14,4 +14,13 @@ Review PR: https://github.com/jarvisdasec-sys/auto-meal-planner/pull/2
 
 Verified temporary preview: https://3000-iycaq5ixkg1d3h08nphk8-f94320cc.us1.manus.computer
 
-Production merge/publication remains pending approval.
+Earlier premium release PR #2 was approved and published. New client-growth release below remains a review candidate.
+
+# Complete-recipe review release
+
+- [x] Quantified cookable recipe meals with instructions, ingredient-derived nutrition/cost reference estimates and seven-day generation; profile exclusions honored throughout generate/swap/load.
+- [x] Working recipe day/date view, swaps/locks/regeneration, favorites/named save/load, household aggregate shopping and batch prep, print/download, explicit dated consumption logging only on user action.
+- [x] Prior records and tools retained; separate validated recipe persistence and hydration; accurate storage failure/browser-local status; no fake accounts/paywall.
+- [x] Client-friendly overview and query deep link, readable responsive black/neon interface; no invented intake/completion.
+- [x] Full local regression/type/lint/build checks pass (108 tests), independent review findings corrected, desktop/mobile real-browser generation/lock/save/shopping/prep/logging/full-week print verified.
+- [x] Review candidate saved to feat/btb-client-growth with linked working preview on port 3103; production remains unchanged pending owner approval.
