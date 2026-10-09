@@ -1,16 +1,11 @@
 {
-  "name": "Build The Body Meal Planner",
-  "short_name": "BTB Planner",
+  "name": "BTB Meal Planner",
+  "short_name": "BTB Meals",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0b0f12",
-  "theme_color": "#39ff14",
+  "background_color": "#060806",
+  "theme_color": "#8CFF00",
   "icons": [
-    {
-      "src": "/icon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
-      "purpose": "any maskable"
-    }
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
   ]
 }

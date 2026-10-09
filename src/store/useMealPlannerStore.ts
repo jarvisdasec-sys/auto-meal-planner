@@ -208,6 +208,7 @@ export interface MealPlannerState {
   generateWeeklyPlan: (options?: { startDateKey?: DateKey; seed?: number }) => void;
   regenerateWeeklyPlan: (options?: { startDateKey?: DateKey; seed?: number }) => void;
   substituteWeeklyPlanSlot: (day: number, mealWindow: MealWindow, foodId: string, servings?: number) => void;
+  copyWeeklyPlanDay: (sourceDay: number, targetDay: number) => void;
   clearWeeklyPlan: () => void;
   setPantryStock: (foodId: string, stock: PantryStockEntry) => void;
   clearPantryStock: (foodId: string) => void;
@@ -484,6 +485,14 @@ export const useMealPlannerStore = create<MealPlannerState>((set, get) => ({
     const plan = state.weeklyPlan ?? createWeeklyPlan(state.foodCatalog, state.profile);
     const slot = { day, mealWindow, foodId, servings: validateServings(servings) };
     return { weeklyPlan: { ...plan, slots: [...plan.slots.filter((item) => item.day !== day || item.mealWindow !== mealWindow), slot] } };
+  }),
+  copyWeeklyPlanDay: (sourceDay, targetDay) => set((state) => {
+    if (![sourceDay, targetDay].every((day) => Number.isInteger(day) && day >= 1 && day <= 7)) throw new Error('Plan days must be between 1 and 7.');
+    if (sourceDay === targetDay) throw new Error('Choose two different plan days.');
+    if (!state.weeklyPlan) throw new Error('Generate a weekly plan first.');
+    const source = resolveActiveWeeklyPlan(state.weeklyPlan, state.foodCatalog, state.profile).filter((slot) => slot.day === sourceDay);
+    if (!source.length) throw new Error('The source day has no allowed meals to copy.');
+    return { weeklyPlan: { ...state.weeklyPlan, slots: [...state.weeklyPlan.slots.filter((slot) => slot.day !== targetDay), ...source.map((slot) => ({ day: targetDay, mealWindow: slot.mealWindow, foodId: slot.food.id, servings: slot.servings ?? 1 }))] } };
   }),
   clearWeeklyPlan: () => set({ weeklyPlan: null }),
   setPantryStock: (foodId, stock) => set((state) => {
