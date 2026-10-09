@@ -57,6 +57,7 @@ button[class*='bg-accent-green']:not([class*='/1']):not([class*='/2']) { color: 
   .print-area * { color: #000 !important; background: transparent !important; border-color: #ccc !important; box-shadow: none !important; }
   .print-area article { break-inside: avoid; }
   .print-area .hidden { display: block; }
+  .recipe-plan-screen > :not([aria-label='Complete printable recipe week']) { display: none !important; }
   .no-print, .btb-sidebar { display: none !important; }
   textarea { border: 0; }
   @page { margin: 10mm; }

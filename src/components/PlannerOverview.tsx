@@ -3,13 +3,14 @@
 import { useMemo } from 'react';
 import { getActiveWeeklyPlan, useMealPlannerStore } from '@/store/useMealPlannerStore';
 import { useWorkspaceStore } from '@/store/useWorkspaceStore';
+import { useRecipeWeekStore } from '@/store/useRecipeWeekStore';
 import { calculateMetabolicSummary, getAdjustmentForDate } from '@/lib/fitnessMealPlanner';
 import { calculateDailyNutritionTotals, getHydrationEntriesForDate } from '@/lib/nutritionLedger';
 import { addDays, localDateKey } from '@/lib/dateKeys';
 import { plannedNutrition } from '@/lib/premiumPlanner';
 import Card from './ui/Card';
 
-export type OverviewDestination = 'profile' | 'week' | 'prep' | 'shopping' | 'tracker' | 'foodLogger' | 'recipes';
+export type OverviewDestination = 'profile' | 'week' | 'recipeWeek' | 'prep' | 'shopping' | 'tracker' | 'foodLogger' | 'recipes';
 export default function PlannerOverview({ navigate }: { navigate: (destination: OverviewDestination) => void }) {
   const profile = useMealPlannerStore((s) => s.profile);
   const weeklyPlan = useMealPlannerStore((s) => s.weeklyPlan);
@@ -19,6 +20,7 @@ export default function PlannerOverview({ navigate }: { navigate: (destination: 
   const savedRecipes = useMealPlannerStore((s) => s.savedRecipes);
   const adjustmentPlan = useMealPlannerStore((s) => s.calorieAdjustmentPlan);
   const household = useWorkspaceStore((s) => s.householdSize);
+  const recipeWeek = useRecipeWeekStore((s) => s.plan);
   const today = localDateKey();
   const summary = useMemo(() => calculateMetabolicSummary(profile), [profile]);
   const consumed = useMemo(() => calculateDailyNutritionTotals(loggedFoods, today, foodCatalog), [loggedFoods, today, foodCatalog]);
@@ -35,15 +37,15 @@ export default function PlannerOverview({ navigate }: { navigate: (destination: 
   ];
   const nextSteps: { step: string; title: string; detail: string; destination: OverviewDestination }[] = [
     { step: '01', title: 'Set your foundation', detail: 'Goals, preferences, and dietary exclusions.', destination: 'profile' },
-    { step: '02', title: 'Build the week', detail: 'Review seven days and personalize your portions.', destination: 'week' },
-    { step: '03', title: 'Prep with purpose', detail: 'Batch quantities, checklist, and safe storage.', destination: 'prep' },
-    { step: '04', title: 'Shop the plan', detail: 'Pantry-aware groceries and a household budget.', destination: 'shopping' },
+    { step: '02', title: 'Build a Recipe Week', detail: 'Measured ingredients, instructions, and safe swaps.', destination: 'recipeWeek' },
+    { step: '03', title: 'Use Food Week tools', detail: 'Keep the original individual-food planner accessible.', destination: 'week' },
+    { step: '04', title: 'Prep with purpose', detail: 'Batch quantities, checklist, and safe storage.', destination: 'prep' },
   ];
 
   return <div className="space-y-6">
     <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-surface-border bg-surface-card px-5 py-4">
-      <div><p className="btb-eyebrow">YOUR NUTRITION OPERATIONS CENTER</p><p className="mt-1 text-sm text-slate-300">{weeklyPlan ? `Your saved week runs ${weeklyPlan.startDateKey} – ${addDays(weeklyPlan.startDateKey, 6)}.` : 'Start with your profile, then turn your next week into a plan.'}</p></div>
-      <button className="btb-button" onClick={() => navigate('week')}>{weeklyPlan ? 'Open weekly plan' : 'Build my week'} <span aria-hidden="true">→</span></button>
+      <div><p className="btb-eyebrow">YOUR NUTRITION OPERATIONS CENTER</p><p className="mt-1 text-sm text-slate-300">{recipeWeek ? `Your Recipe Week runs ${recipeWeek.startDateKey} – ${addDays(recipeWeek.startDateKey, 6)} with ${recipeWeek.slots.length}/28 safe selections.` : 'Start with a complete Recipe Week, then review every measured ingredient before shopping.'}</p></div>
+      <div className="flex flex-wrap gap-2"><button className="btb-button" onClick={() => navigate('recipeWeek')}>{recipeWeek ? 'Open Recipe Week' : 'Build a Recipe Week'} <span aria-hidden="true">→</span></button><button className="btb-secondary" onClick={() => navigate('week')}>Food Week</button></div>
     </div>
     <div className="grid gap-6 xl:grid-cols-[1.45fr_1fr]">
       <Card className="relative overflow-hidden" title="Today, by the numbers" subtitle="Actual food logged today—not food merely planned.">
@@ -58,7 +60,7 @@ export default function PlannerOverview({ navigate }: { navigate: (destination: 
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <button className="btb-stat text-left transition-colors hover:border-accent/30" onClick={() => navigate('week')}><span className="btb-eyebrow">WEEK COVERAGE</span><p>{completeDays}<span className="text-lg text-slate-500"> / 7 days</span></p><span>{slots.length} selected meal windows</span></button>
       <button className="btb-stat text-left transition-colors hover:border-accent/30" onClick={() => navigate('tracker')}><span className="btb-eyebrow">HYDRATION TODAY</span><p>{Math.round(hydration)}<span className="text-lg text-slate-500"> oz</span></p><span>Open tracker to record water</span></button>
-      <button className="btb-stat text-left transition-colors hover:border-accent/30" onClick={() => navigate('recipes')}><span className="btb-eyebrow">RECIPE LIBRARY</span><p>{savedRecipes.length}</p><span>Saved recipes in this browser</span></button>
+      <button className="btb-stat text-left transition-colors hover:border-accent/30" onClick={() => navigate('recipeWeek')}><span className="btb-eyebrow">RECIPE WEEK</span><p>{recipeWeek?.slots.length ?? 0}<span className="text-lg text-slate-500"> / 28 meals</span></p><span>{recipeWeek ? 'Open measured recipes' : 'Build a complete recipe plan'}</span></button>
       <button className="btb-stat text-left transition-colors hover:border-accent/30" onClick={() => navigate('shopping')}><span className="btb-eyebrow">HOUSEHOLD</span><p>{household}</p><span>Prep and grocery multiplier only</span></button>
     </div>
     <Card title="Planned is not consumed" subtitle="Keep intention and actual intake separate."><p className="text-sm text-slate-300">{slots.length ? `Your selected week contains approximately ${Math.round(planned.calories).toLocaleString()} kcal across ${slots.length} meal windows. Review each day's totals and adjust the portions; automatic selections do not guarantee balanced meals or meeting your targets.` : 'Your weekly plan is empty. Planned meals will appear here after you create a week; only logged foods count toward today’s intake.'}</p><p className="mt-3 text-xs text-slate-400">Nutrition and grocery values are estimates. Check labels and allergens, and consult a qualified professional for individualized needs.</p></Card>
